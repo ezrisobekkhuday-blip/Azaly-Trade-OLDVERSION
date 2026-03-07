@@ -76,6 +76,23 @@ def ensure_shop_columns() -> None:
         if "storefront_image" not in columns:
             connection.execute(text("ALTER TABLE shops ADD COLUMN storefront_image VARCHAR(255) DEFAULT '' NOT NULL"))
 
+        if "storefront_images" not in columns:
+            connection.execute(
+                text("ALTER TABLE shops ADD COLUMN storefront_images JSON DEFAULT '[]' NOT NULL")
+            )
+
+        if "storefront_image" in columns:
+            connection.execute(
+                text(
+                    """
+                    UPDATE shops
+                    SET storefront_images = '["' || storefront_image || '"]'
+                    WHERE storefront_image <> ''
+                      AND (storefront_images IS NULL OR storefront_images = '[]')
+                    """
+                )
+            )
+
 
 def ensure_existing_products_have_shop(db: Session) -> None:
     unassigned_products = list(db.scalars(select(Product).where(Product.shop_id.is_(None))).all())
@@ -125,7 +142,49 @@ def normalize_image_path(image_path: str) -> str:
     return image_path
 
 
+def normalize_image_list(images: list[str]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+
+    for image in images:
+        cleaned = normalize_image_path(image.strip())
+
+        if not cleaned or cleaned in seen:
+            continue
+
+        normalized.append(cleaned)
+        seen.add(cleaned)
+
+    return normalized
+
+
+def resolve_storefront_images(payload: ShopCreate | ShopUpdate) -> list[str]:
+    normalized_images = normalize_image_list(payload.storefront_images)
+
+    if normalized_images:
+        return normalized_images
+
+    if payload.storefront_image.strip():
+        return [normalize_image_path(payload.storefront_image.strip())]
+
+    return []
+
+
+def get_shop_storefront_images(shop: Shop) -> list[str]:
+    images = normalize_image_list(shop.storefront_images)
+
+    if shop.storefront_image and shop.storefront_image not in images:
+        images.append(shop.storefront_image)
+
+    return images
+
+
 def serialize_shop(request: Request, shop: Shop, products_count: int = 0) -> ShopRead:
+    storefront_images = [
+        to_public_image_url(request, image)
+        for image in get_shop_storefront_images(shop)
+    ]
+
     return ShopRead(
         id=str(shop.id),
         name=shop.name,
@@ -134,9 +193,8 @@ def serialize_shop(request: Request, shop: Shop, products_count: int = 0) -> Sho
         latitude=shop.latitude,
         longitude=shop.longitude,
         description=shop.description,
-        storefront_image=to_public_image_url(request, shop.storefront_image)
-        if shop.storefront_image
-        else "",
+        storefront_images=storefront_images,
+        storefront_image=storefront_images[0] if storefront_images else "",
         business_card_image=to_public_image_url(request, shop.business_card_image)
         if shop.business_card_image
         else "",
@@ -223,7 +281,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Azaly Trade API", version="0.3.0", lifespan=lifespan)
+app = FastAPI(title="Azaly Trade API", version="0.4.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -293,6 +351,7 @@ def create_shop(
     db: Session = Depends(get_db),
 ) -> ShopRead:
     validate_shop_photo(payload.photo)
+    storefront_images = resolve_storefront_images(payload)
 
     shop = Shop(
         name=normalize_shop_name(payload.name),
@@ -301,9 +360,8 @@ def create_shop(
         latitude=payload.latitude,
         longitude=payload.longitude,
         description=payload.description.strip(),
-        storefront_image=normalize_image_path(payload.storefront_image.strip())
-        if payload.storefront_image.strip()
-        else "",
+        storefront_images=storefront_images,
+        storefront_image=storefront_images[0] if storefront_images else "",
         business_card_image=normalize_image_path(payload.business_card_image.strip())
         if payload.business_card_image.strip()
         else "",
@@ -325,14 +383,11 @@ def update_shop(
     shop = get_shop_or_404(shop_id, db)
 
     new_photo = normalize_image_path(payload.photo.strip())
+    new_storefront_images = resolve_storefront_images(payload)
+    new_storefront = new_storefront_images[0] if new_storefront_images else ""
     new_business_card = (
         normalize_image_path(payload.business_card_image.strip())
         if payload.business_card_image.strip()
-        else ""
-    )
-    new_storefront = (
-        normalize_image_path(payload.storefront_image.strip())
-        if payload.storefront_image.strip()
         else ""
     )
     removed_images: list[str] = []
@@ -340,8 +395,9 @@ def update_shop(
     if shop.photo and shop.photo != new_photo:
         removed_images.append(shop.photo)
 
-    if shop.storefront_image and shop.storefront_image != new_storefront:
-        removed_images.append(shop.storefront_image)
+    for image in get_shop_storefront_images(shop):
+        if image not in new_storefront_images:
+            removed_images.append(image)
 
     if shop.business_card_image and shop.business_card_image != new_business_card:
         removed_images.append(shop.business_card_image)
@@ -352,6 +408,7 @@ def update_shop(
     shop.latitude = payload.latitude
     shop.longitude = payload.longitude
     shop.description = payload.description.strip()
+    shop.storefront_images = new_storefront_images
     shop.storefront_image = new_storefront
     shop.business_card_image = new_business_card
 
@@ -378,8 +435,7 @@ def delete_shop(shop_id: int, db: Session = Depends(get_db)) -> None:
     if shop.business_card_image:
         images_to_delete.append(shop.business_card_image)
 
-    if shop.storefront_image:
-        images_to_delete.append(shop.storefront_image)
+    images_to_delete.extend(get_shop_storefront_images(shop))
 
     for product in products:
         images_to_delete.extend(product.images)
