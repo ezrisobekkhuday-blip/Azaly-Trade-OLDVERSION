@@ -21,6 +21,8 @@ class ShopCreate(BaseModel):
     name: str = Field(default="", max_length=120)
     photo: str = Field(min_length=1)
     location: str = Field(default="", max_length=255)
+    latitude: float | None = None
+    longitude: float | None = None
     description: str = ""
     business_card_image: str = ""
 
@@ -29,6 +31,8 @@ class ShopUpdate(BaseModel):
     name: str = Field(default="", max_length=120)
     photo: str = Field(min_length=1)
     location: str = Field(default="", max_length=255)
+    latitude: float | None = None
+    longitude: float | None = None
     description: str = ""
     business_card_image: str = ""
 
@@ -38,6 +42,8 @@ class ShopRead(BaseModel):
     name: str
     photo: str
     location: str
+    latitude: float | None
+    longitude: float | None
     description: str
     business_card_image: str
     products_count: int

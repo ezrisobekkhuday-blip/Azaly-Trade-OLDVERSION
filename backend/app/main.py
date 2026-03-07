@@ -58,6 +58,22 @@ def ensure_product_columns() -> None:
             connection.execute(text("ALTER TABLE products ADD COLUMN shop_id INTEGER"))
 
 
+def ensure_shop_columns() -> None:
+    inspector = inspect(engine)
+
+    if "shops" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("shops")}
+
+    with engine.begin() as connection:
+        if "latitude" not in columns:
+            connection.execute(text("ALTER TABLE shops ADD COLUMN latitude FLOAT"))
+
+        if "longitude" not in columns:
+            connection.execute(text("ALTER TABLE shops ADD COLUMN longitude FLOAT"))
+
+
 def ensure_existing_products_have_shop(db: Session) -> None:
     unassigned_products = list(db.scalars(select(Product).where(Product.shop_id.is_(None))).all())
 
@@ -112,6 +128,8 @@ def serialize_shop(request: Request, shop: Shop, products_count: int = 0) -> Sho
         name=shop.name,
         photo=to_public_image_url(request, shop.photo) if shop.photo else "",
         location=shop.location,
+        latitude=shop.latitude,
+        longitude=shop.longitude,
         description=shop.description,
         business_card_image=to_public_image_url(request, shop.business_card_image)
         if shop.business_card_image
@@ -190,6 +208,7 @@ async def lifespan(_: FastAPI):
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(bind=engine)
     ensure_product_columns()
+    ensure_shop_columns()
 
     with SessionLocal() as db:
         ensure_profile(db)
@@ -273,6 +292,8 @@ def create_shop(
         name=normalize_shop_name(payload.name),
         photo=normalize_image_path(payload.photo.strip()),
         location=payload.location.strip(),
+        latitude=payload.latitude,
+        longitude=payload.longitude,
         description=payload.description.strip(),
         business_card_image=normalize_image_path(payload.business_card_image.strip())
         if payload.business_card_image.strip()
@@ -311,6 +332,8 @@ def update_shop(
     shop.name = normalize_shop_name(payload.name)
     shop.photo = new_photo
     shop.location = payload.location.strip()
+    shop.latitude = payload.latitude
+    shop.longitude = payload.longitude
     shop.description = payload.description.strip()
     shop.business_card_image = new_business_card
 
