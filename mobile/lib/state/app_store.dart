@@ -71,24 +71,78 @@ class AppStore extends ChangeNotifier {
   Future<void> createShop({
     required String name,
     required String photoPath,
+    required List<String> storefrontPhotoPaths,
     required String location,
+    required double? latitude,
+    required double? longitude,
     required String description,
     required String businessCardPath,
   }) async {
     final photo = await _prepareSingleImage(photoPath);
+    final storefrontImages = await _prepareImagePaths(storefrontPhotoPaths);
     final businessCard = businessCardPath.trim().isEmpty
         ? ''
         : await _prepareSingleImage(businessCardPath);
 
-    final createdShop = await _apiClient.createShop(
+    final serverShop = await _apiClient.createShop(
       name: name.trim(),
       photo: photo,
       location: location.trim(),
+      latitude: latitude,
+      longitude: longitude,
       description: description.trim(),
+      storefrontImages: storefrontImages,
       businessCardImage: businessCard,
+    );
+    final createdShop = serverShop.copyWith(
+      photo: serverShop.photo.isEmpty ? photo : serverShop.photo,
+      location: serverShop.location.isEmpty
+          ? location.trim()
+          : serverShop.location,
+      latitude: serverShop.latitude ?? latitude,
+      longitude: serverShop.longitude ?? longitude,
+      storefrontImages: serverShop.storefrontImages.isEmpty
+          ? storefrontImages
+          : serverShop.storefrontImages,
+      businessCardImage: serverShop.businessCardImage.isEmpty
+          ? businessCard
+          : serverShop.businessCardImage,
     );
 
     _shops.insert(0, createdShop);
+    _syncShopCounts();
+    notifyListeners();
+  }
+
+  Future<void> updateShop(Shop updatedShop) async {
+    final index = _shops.indexWhere((shop) => shop.id == updatedShop.id);
+
+    if (index == -1) {
+      return;
+    }
+
+    final serverShop = await _apiClient.updateShop(updatedShop);
+    _shops[index] = serverShop.copyWith(
+      photo: serverShop.photo.isEmpty ? updatedShop.photo : serverShop.photo,
+      latitude: serverShop.latitude ?? updatedShop.latitude,
+      longitude: serverShop.longitude ?? updatedShop.longitude,
+      location: serverShop.location.isEmpty
+          ? updatedShop.location
+          : serverShop.location,
+      storefrontImages: serverShop.storefrontImages.isEmpty
+          ? updatedShop.storefrontImages
+          : serverShop.storefrontImages,
+      businessCardImage: serverShop.businessCardImage.isEmpty
+          ? updatedShop.businessCardImage
+          : serverShop.businessCardImage,
+    );
+    notifyListeners();
+  }
+
+  Future<void> deleteShop(String shopId) async {
+    await _apiClient.deleteShop(shopId);
+    _shops.removeWhere((shop) => shop.id == shopId);
+    _products.removeWhere((product) => product.shopId == shopId);
     _syncShopCounts();
     notifyListeners();
   }
@@ -97,6 +151,8 @@ class AppStore extends ChangeNotifier {
     required String shopId,
     required List<String> imagePaths,
     required String amount,
+    required int quantity,
+    required String color,
     required String material,
     required String size,
   }) async {
@@ -105,6 +161,8 @@ class AppStore extends ChangeNotifier {
       shopId: shopId,
       images: preparedImages,
       amount: amount.trim(),
+      quantity: quantity < 1 ? 1 : quantity,
+      color: color.trim(),
       material: material.trim(),
       size: size.trim(),
     );

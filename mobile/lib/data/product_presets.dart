@@ -81,3 +81,43 @@ const sizeSuggestions = <String>[
   ...numericSizeSuggestions,
   ...specialSizeSuggestions,
 ];
+
+const popularColorSuggestions = <String>[
+  'Black',
+  'White',
+  'Beige',
+  'Blue',
+  'Brown',
+  'Gray',
+  'Green',
+  'Red',
+];
+
+const colorSuggestions = <String>[
+  'Black',
+  'White',
+  'Beige',
+  'Blue',
+  'Navy',
+  'Sky Blue',
+  'Brown',
+  'Chocolate',
+  'Gray',
+  'Silver',
+  'Green',
+  'Olive',
+  'Mint',
+  'Red',
+  'Burgundy',
+  'Pink',
+  'Fuchsia',
+  'Purple',
+  'Lilac',
+  'Yellow',
+  'Mustard',
+  'Orange',
+  'Milk',
+  'Cream',
+  'Graphite',
+  'Khaki',
+];

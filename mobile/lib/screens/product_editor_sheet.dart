@@ -19,30 +19,70 @@ class ProductEditorSheet extends StatefulWidget {
 class _ProductEditorSheetState extends State<ProductEditorSheet> {
   final ImagePicker _picker = ImagePicker();
   late final TextEditingController _amountController;
+  late final TextEditingController _colorController;
   late final TextEditingController _materialController;
   late final TextEditingController _sizeController;
+  late final TextEditingController _quantityController;
   late final List<String> _imagePaths;
+  late int _quantity;
 
   @override
   void initState() {
     super.initState();
     _amountController = TextEditingController(text: widget.product.amount);
+    _colorController = TextEditingController(text: widget.product.color);
     _materialController = TextEditingController(text: widget.product.material);
     _sizeController = TextEditingController(text: widget.product.size);
+    _quantity = widget.product.quantity < 1 ? 1 : widget.product.quantity;
+    _quantityController = TextEditingController(text: '$_quantity');
     _imagePaths = List<String>.from(widget.product.imagePaths);
   }
 
   @override
   void dispose() {
     _amountController.dispose();
+    _colorController.dispose();
     _materialController.dispose();
     _sizeController.dispose();
+    _quantityController.dispose();
     super.dispose();
+  }
+
+  double? get _draftTotal {
+    final amount = parseProductAmount(_amountController.text);
+
+    if (amount == null) {
+      return null;
+    }
+
+    return amount * _quantity;
+  }
+
+  void _setQuantity(int value) {
+    final normalized = value < 1 ? 1 : value;
+
+    setState(() {
+      _quantity = normalized;
+      _quantityController.value = TextEditingValue(
+        text: '$normalized',
+        selection: TextSelection.collapsed(offset: '$normalized'.length),
+      );
+    });
+  }
+
+  void _syncQuantityFromText(String value) {
+    final parsed = int.tryParse(value.trim());
+
+    if (parsed == null) {
+      return;
+    }
+
+    _setQuantity(parsed);
   }
 
   Future<void> _pickFromGallery() async {
     try {
-      final files = await _picker.pickMultiImage(imageQuality: 85);
+      final files = await _picker.pickMultiImage(imageQuality: 74);
 
       if (!mounted || files.isEmpty) {
         return;
@@ -60,7 +100,7 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
     try {
       final file = await _picker.pickImage(
         source: ImageSource.camera,
-        imageQuality: 85,
+        imageQuality: 74,
       );
 
       if (!mounted || file == null) {
@@ -83,7 +123,7 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
 
   void _save() {
     if (_imagePaths.isEmpty) {
-      _showMessage('У товара должно остаться хотя бы одно фото.');
+      _showMessage('У закупа должно остаться хотя бы одно фото.');
       return;
     }
 
@@ -91,6 +131,8 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
       widget.product.copyWith(
         imagePaths: List<String>.from(_imagePaths),
         amount: _amountController.text.trim(),
+        quantity: _quantity,
+        color: _colorController.text.trim(),
         material: _materialController.text.trim(),
         size: _sizeController.text.trim(),
       ),
@@ -115,7 +157,7 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
           border: Border.all(color: AppColors.border),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(18),
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -127,15 +169,17 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Редактировать товар',
+                            'Редактировать закуп',
                             style: textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           Text(
-                            'Фото можно поменять, а материал и размер выбрать из подсказок или ввести вручную.',
-                            style: textTheme.bodyLarge?.copyWith(
+                            'Обнови фото, цену закупа, количество и остальные поля.',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodyMedium?.copyWith(
                               color: AppColors.textSecondary,
                             ),
                           ),
@@ -212,13 +256,43 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
                     ),
                   ),
                 const SizedBox(height: 18),
+                _EditorPurchaseSummaryCard(
+                  amount: _amountController.text,
+                  quantity: _quantity,
+                  total: _draftTotal,
+                ),
+                const SizedBox(height: 14),
                 TextField(
                   controller: _amountController,
-                  keyboardType: TextInputType.number,
+                  onChanged: (_) => setState(() {}),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: const InputDecoration(
-                    labelText: 'Сумма',
+                    labelText: 'Цена закупа',
                     hintText: 'Например: 120 000',
                   ),
+                ),
+                const SizedBox(height: 14),
+                _EditorQuantityStepper(
+                  controller: _quantityController,
+                  quantity: _quantity,
+                  onChanged: _syncQuantityFromText,
+                  onDecrease: () => _setQuantity(_quantity - 1),
+                  onIncrease: () => _setQuantity(_quantity + 1),
+                ),
+                const SizedBox(height: 14),
+                SuggestionField(
+                  controller: _colorController,
+                  label: 'Цвет',
+                  hint: 'Например: Black, Beige, Blue',
+                  suggestions: colorSuggestions,
+                  quickGroups: const [
+                    SuggestionGroup(
+                      label: 'Популярные цвета',
+                      items: popularColorSuggestions,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 14),
                 SuggestionField(
@@ -265,13 +339,130 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
                       minimumSize: const Size.fromHeight(56),
                     ),
                     onPressed: _save,
-                    child: const Text('Сохранить'),
+                    child: const Text('Сохранить закуп'),
                   ),
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _EditorPurchaseSummaryCard extends StatelessWidget {
+  const _EditorPurchaseSummaryCard({
+    required this.amount,
+    required this.quantity,
+    required this.total,
+  });
+
+  final String amount;
+  final int quantity;
+  final double? total;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceStrong,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Итог закупа',
+            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            total == null
+                ? 'Укажи цену и количество'
+                : '${amount.trim().isEmpty ? '0' : amount.trim()} x $quantity = ${formatProductMoney(total!)}',
+            style: textTheme.bodyLarge?.copyWith(
+              color: total == null
+                  ? AppColors.textSecondary
+                  : AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EditorQuantityStepper extends StatelessWidget {
+  const _EditorQuantityStepper({
+    required this.controller,
+    required this.quantity,
+    required this.onChanged,
+    required this.onDecrease,
+    required this.onIncrease,
+  });
+
+  final TextEditingController controller;
+  final int quantity;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Количество',
+            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              IconButton.filledTonal(
+                onPressed: quantity > 1 ? onDecrease : null,
+                icon: const Icon(Icons.remove),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  onChanged: onChanged,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  decoration: const InputDecoration(
+                    labelText: 'Штук',
+                    hintText: '1',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              IconButton.filled(
+                onPressed: onIncrease,
+                style: IconButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: const Color(0xFF08110F),
+                ),
+                icon: const Icon(Icons.add),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -293,7 +484,7 @@ class _EmptyEditorImages extends StatelessWidget {
         border: Border.all(color: AppColors.border),
       ),
       child: Text(
-        'Добавь хотя бы одно фото, чтобы сохранить товар.',
+        'Добавь хотя бы одно фото, чтобы сохранить закуп.',
         style: textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary),
       ),
     );

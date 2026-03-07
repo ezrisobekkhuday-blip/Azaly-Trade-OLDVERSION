@@ -20,12 +20,20 @@ class ProductImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cacheWidth = width != null && width!.isFinite ? width!.round() : null;
+    final cacheHeight = height != null && height!.isFinite
+        ? height!.round()
+        : null;
+
     if (isRemoteImageSource(source)) {
       return Image.network(
         source,
         width: width,
         height: height,
         fit: fit,
+        cacheWidth: cacheWidth,
+        cacheHeight: cacheHeight,
+        filterQuality: FilterQuality.low,
         errorBuilder: (_, _, _) => _ImageFallback(width: width, height: height),
       );
     }
@@ -35,6 +43,9 @@ class ProductImage extends StatelessWidget {
       width: width,
       height: height,
       fit: fit,
+      cacheWidth: cacheWidth,
+      cacheHeight: cacheHeight,
+      filterQuality: FilterQuality.low,
       errorBuilder: (_, _, _) => _ImageFallback(width: width, height: height),
     );
   }

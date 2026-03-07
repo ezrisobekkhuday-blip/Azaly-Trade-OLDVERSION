@@ -27,28 +27,21 @@ class SectionHeroCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(color: AppColors.border),
         gradient: LinearGradient(
           colors: colors,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 28,
-            offset: Offset(0, 18),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: badgeColor.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(999),
@@ -57,32 +50,33 @@ class SectionHeroCard extends StatelessWidget {
               badge,
               style: textTheme.labelLarge?.copyWith(
                 color: badgeColor,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
               ),
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           Text(
             title,
-            style: textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w800,
+            style: textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Text(
             description,
-            style: textTheme.bodyLarge?.copyWith(
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodyMedium?.copyWith(
               color: AppColors.textSecondary,
-              height: 1.55,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: const Color(0x73060A14),
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(color: AppColors.border),
             ),
             child: Column(
@@ -90,11 +84,11 @@ class SectionHeroCard extends StatelessWidget {
               children: [
                 Text(
                   count.toString(),
-                  style: textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+                  style: textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
                   countLabel,
                   style: textTheme.bodyMedium?.copyWith(
@@ -129,34 +123,26 @@ class EmptyStateCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(color: AppColors.border),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 28,
-            offset: Offset(0, 18),
-          ),
-        ],
       ),
       child: Column(
         children: [
-          Icon(icon, size: 34, color: iconColor),
-          const SizedBox(height: 14),
+          Icon(icon, size: 28, color: iconColor),
+          const SizedBox(height: 12),
           Text(
             title,
-            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           Text(
             description,
             textAlign: TextAlign.center,
-            style: textTheme.bodyLarge?.copyWith(
+            style: textTheme.bodyMedium?.copyWith(
               color: AppColors.textSecondary,
-              height: 1.55,
             ),
           ),
         ],

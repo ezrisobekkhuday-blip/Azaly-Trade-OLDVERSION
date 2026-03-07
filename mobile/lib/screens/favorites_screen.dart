@@ -63,8 +63,11 @@ class FavoritesScreen extends StatelessWidget {
         .toList();
     final remoteImages = product.imagePaths.where(isRemoteImageSource).toList();
     final summary = [
-      'Избранный товар из Azaly Trade',
-      'Сумма: ${product.amount.isEmpty ? 'Не указано' : product.amount}',
+      'Избранный закуп из Azaly Trade',
+      'Цена закупа: ${product.amount.isEmpty ? 'Не указано' : product.amount}',
+      'Количество: ${product.quantity}',
+      'Итог: ${product.totalValue == null ? 'Не указано' : formatProductMoney(product.totalValue!)}',
+      'Цвет: ${product.color.isEmpty ? 'Не указано' : product.color}',
       'Материал: ${product.material.isEmpty ? 'Не указано' : product.material}',
       'Размер: ${product.size.isEmpty ? 'Не указано' : product.size}',
       'Статус: ${product.status}',
@@ -75,7 +78,7 @@ class FavoritesScreen extends StatelessWidget {
       await SharePlus.instance.share(
         ShareParams(
           title: 'Azaly Trade',
-          subject: 'Избранный товар',
+          subject: 'Избранный закуп',
           text: summary,
           files: files.isEmpty ? null : files,
         ),
@@ -109,7 +112,7 @@ class FavoritesScreen extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 132),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
           children: [
             SectionHeroCard(
               badge: 'FAVORITES',
@@ -168,18 +171,11 @@ class _FavoriteCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(color: AppColors.border),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 28,
-            offset: Offset(0, 18),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,29 +232,34 @@ class _FavoriteCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Row(
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
             children: [
-              Expanded(
-                child: _InfoTile(
-                  label: 'Сумма',
-                  value: product.amount.isEmpty ? 'Не указано' : product.amount,
-                ),
+              _InfoTile(
+                label: 'Цена',
+                value: product.amount.isEmpty ? 'Не указано' : product.amount,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _InfoTile(
-                  label: 'Материал',
-                  value: product.material.isEmpty
-                      ? 'Не указано'
-                      : product.material,
-                ),
+              _InfoTile(label: 'Штук', value: '${product.quantity}'),
+              _InfoTile(
+                label: 'Итог',
+                value: product.totalValue == null
+                    ? 'Не указано'
+                    : formatProductMoney(product.totalValue!),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _InfoTile(
-                  label: 'Размер',
-                  value: product.size.isEmpty ? 'Не указано' : product.size,
-                ),
+              _InfoTile(
+                label: 'Цвет',
+                value: product.color.isEmpty ? 'Не указано' : product.color,
+              ),
+              _InfoTile(
+                label: 'Материал',
+                value: product.material.isEmpty
+                    ? 'Не указано'
+                    : product.material,
+              ),
+              _InfoTile(
+                label: 'Размер',
+                value: product.size.isEmpty ? 'Не указано' : product.size,
               ),
             ],
           ),
@@ -303,6 +304,7 @@ class _InfoTile extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
+      constraints: const BoxConstraints(minWidth: 104),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.surfaceStrong,

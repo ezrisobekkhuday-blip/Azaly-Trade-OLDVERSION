@@ -28,10 +28,53 @@ ThemeData buildAppTheme() {
     ),
   );
 
-  final textTheme = GoogleFonts.manropeTextTheme(base.textTheme).apply(
-    bodyColor: AppColors.textPrimary,
-    displayColor: AppColors.textPrimary,
-  );
+  final textTheme = GoogleFonts.manropeTextTheme(base.textTheme)
+      .copyWith(
+        headlineMedium: GoogleFonts.manrope(
+          fontSize: 28,
+          fontWeight: FontWeight.w700,
+          height: 1.12,
+        ),
+        headlineSmall: GoogleFonts.manrope(
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          height: 1.15,
+        ),
+        titleLarge: GoogleFonts.manrope(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          height: 1.2,
+        ),
+        titleMedium: GoogleFonts.manrope(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          height: 1.2,
+        ),
+        bodyLarge: GoogleFonts.manrope(
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+          height: 1.42,
+        ),
+        bodyMedium: GoogleFonts.manrope(
+          fontSize: 13.5,
+          fontWeight: FontWeight.w500,
+          height: 1.38,
+        ),
+        labelLarge: GoogleFonts.manrope(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          height: 1.1,
+        ),
+        labelMedium: GoogleFonts.manrope(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w600,
+          height: 1.1,
+        ),
+      )
+      .apply(
+        bodyColor: AppColors.textPrimary,
+        displayColor: AppColors.textPrimary,
+      );
 
   return base.copyWith(
     scaffoldBackgroundColor: AppColors.background,
@@ -43,8 +86,8 @@ ThemeData buildAppTheme() {
       scrolledUnderElevation: 0,
       titleTextStyle: GoogleFonts.manrope(
         color: AppColors.textPrimary,
-        fontSize: 32,
-        fontWeight: FontWeight.w800,
+        fontSize: 26,
+        fontWeight: FontWeight.w700,
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
@@ -52,7 +95,7 @@ ThemeData buildAppTheme() {
       indicatorColor: AppColors.surfaceStrong,
       elevation: 0,
       labelTextStyle: WidgetStateProperty.all(
-        GoogleFonts.manrope(fontSize: 12, fontWeight: FontWeight.w700),
+        GoogleFonts.manrope(fontSize: 11, fontWeight: FontWeight.w600),
       ),
       iconTheme: WidgetStateProperty.resolveWith(
         (states) => IconThemeData(
@@ -74,7 +117,8 @@ ThemeData buildAppTheme() {
       backgroundColor: AppColors.surfaceStrong,
       contentTextStyle: GoogleFonts.manrope(
         color: AppColors.textPrimary,
-        fontWeight: FontWeight.w700,
+        fontSize: 13.5,
+        fontWeight: FontWeight.w600,
       ),
       behavior: SnackBarBehavior.floating,
     ),
@@ -83,25 +127,25 @@ ThemeData buildAppTheme() {
       fillColor: AppColors.surfaceMuted,
       hintStyle: GoogleFonts.manrope(
         color: AppColors.textMuted,
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w400,
       ),
       labelStyle: GoogleFonts.manrope(
         color: AppColors.textSecondary,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w600,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         borderSide: const BorderSide(color: AppColors.border),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         borderSide: const BorderSide(color: AppColors.primary),
       ),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         borderSide: const BorderSide(color: AppColors.border),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     ),
   );
 }

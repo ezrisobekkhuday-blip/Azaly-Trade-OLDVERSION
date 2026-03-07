@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../models/shop.dart';
+import '../services/api_client.dart';
 import '../state/app_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/product_image.dart';
 import '../widgets/section_cards.dart';
+import 'shop_editor_sheet.dart';
 import 'shop_details_screen.dart';
 
 class ShopsScreen extends StatelessWidget {
@@ -21,6 +23,94 @@ class ShopsScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _openEditor(BuildContext context, Shop shop) async {
+    final updatedShop = await showModalBottomSheet<Shop>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ShopEditorSheet(shop: shop),
+    );
+
+    if (updatedShop == null || !context.mounted) {
+      return;
+    }
+
+    try {
+      await store.updateShop(updatedShop);
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Магазин обновлён.')));
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              describeError(
+                error,
+                fallbackMessage: 'Не удалось обновить магазин.',
+              ),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteShop(BuildContext context, Shop shop) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Удалить магазин?'),
+        content: const Text(
+          'Магазин, товары и фото будут удалены без возможности восстановления.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: AppColors.textPrimary,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+
+    try {
+      await store.deleteShop(shop.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Магазин удалён.')));
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              describeError(
+                error,
+                fallbackMessage: 'Не удалось удалить магазин.',
+              ),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final shops = store.shops;
@@ -29,7 +119,7 @@ class ShopsScreen extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 132),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
           children: [
             SectionHeroCard(
               badge: 'SHOPS',
@@ -57,6 +147,8 @@ class ShopsScreen extends StatelessWidget {
                   child: _ShopCard(
                     shop: shop,
                     onOpen: () => _openShop(context, shop),
+                    onEdit: () => _openEditor(context, shop),
+                    onDelete: () => _deleteShop(context, shop),
                   ),
                 ),
               ),
@@ -68,28 +160,28 @@ class ShopsScreen extends StatelessWidget {
 }
 
 class _ShopCard extends StatelessWidget {
-  const _ShopCard({required this.shop, required this.onOpen});
+  const _ShopCard({
+    required this.shop,
+    required this.onOpen,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   final Shop shop;
   final VoidCallback onOpen;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(color: AppColors.border),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 28,
-            offset: Offset(0, 18),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,9 +209,7 @@ class _ShopCard extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             shop.name.isEmpty ? 'Новый магазин' : shop.name,
-            style: textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
+            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
           if (shop.location.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -153,6 +243,30 @@ class _ShopCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Редактировать'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.danger.withValues(alpha: 0.14),
+                    foregroundColor: AppColors.danger,
+                  ),
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Удалить'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: FilledButton(

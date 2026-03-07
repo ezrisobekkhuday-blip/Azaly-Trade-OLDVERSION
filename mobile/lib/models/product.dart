@@ -5,6 +5,8 @@ class Product {
     required this.shopName,
     required this.imagePaths,
     required this.amount,
+    required this.quantity,
+    required this.color,
     required this.material,
     required this.size,
     required this.status,
@@ -17,17 +19,33 @@ class Product {
   final String shopName;
   final List<String> imagePaths;
   final String amount;
+  final int quantity;
+  final String color;
   final String material;
   final String size;
   final String status;
   final DateTime createdAt;
   final bool isFavorite;
 
+  double? get amountValue => parseProductAmount(amount);
+
+  double? get totalValue {
+    final parsedAmount = amountValue;
+
+    if (parsedAmount == null) {
+      return null;
+    }
+
+    return parsedAmount * quantity;
+  }
+
   Product copyWith({
     String? shopId,
     String? shopName,
     List<String>? imagePaths,
     String? amount,
+    int? quantity,
+    String? color,
     String? material,
     String? size,
     String? status,
@@ -39,6 +57,8 @@ class Product {
       shopName: shopName ?? this.shopName,
       imagePaths: imagePaths ?? this.imagePaths,
       amount: amount ?? this.amount,
+      quantity: quantity ?? this.quantity,
+      color: color ?? this.color,
       material: material ?? this.material,
       size: size ?? this.size,
       status: status ?? this.status,
@@ -59,6 +79,8 @@ class Product {
           json['shopName'] as String? ?? json['shop_name'] as String? ?? '',
       imagePaths: List<String>.from(rawImages as List<dynamic>? ?? const []),
       amount: json['amount'] as String? ?? '',
+      quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+      color: json['color'] as String? ?? '',
       material: json['material'] as String? ?? '',
       size: json['size'] as String? ?? '',
       status: json['status'] as String? ?? 'new',
@@ -77,4 +99,43 @@ String formatProductDate(DateTime date) {
   final minute = date.minute.toString().padLeft(2, '0');
 
   return '$day.$month.$year | $hour:$minute';
+}
+
+double? parseProductAmount(String value) {
+  final normalized = value
+      .trim()
+      .replaceAll(' ', '')
+      .replaceAll(',', '.')
+      .replaceAll(RegExp(r'[^0-9.]'), '');
+
+  if (normalized.isEmpty) {
+    return null;
+  }
+
+  return double.tryParse(normalized);
+}
+
+String formatProductMoney(double value) {
+  final hasFraction = value % 1 != 0;
+  final fixed = hasFraction
+      ? value.toStringAsFixed(2)
+      : value.toStringAsFixed(0);
+  final parts = fixed.split('.');
+  final whole = parts.first;
+  final buffer = StringBuffer();
+
+  for (var index = 0; index < whole.length; index += 1) {
+    final reversedIndex = whole.length - index;
+    buffer.write(whole[index]);
+
+    if (reversedIndex > 1 && reversedIndex % 3 == 1) {
+      buffer.write(' ');
+    }
+  }
+
+  if (!hasFraction) {
+    return buffer.toString();
+  }
+
+  return '${buffer.toString()}.${parts.last}';
 }

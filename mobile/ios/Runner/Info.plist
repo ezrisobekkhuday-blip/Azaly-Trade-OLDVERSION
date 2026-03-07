@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Allow camera access to take product photos.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Allow location access to fill in the real store location.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Allow photo library access to add product images.</string>
 	<key>UIApplicationSceneManifest</key>

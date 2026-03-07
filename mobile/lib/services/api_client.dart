@@ -89,7 +89,10 @@ class ApiClient {
     required String name,
     required String photo,
     required String location,
+    required double? latitude,
+    required double? longitude,
     required String description,
+    required List<String> storefrontImages,
     required String businessCardImage,
   }) async {
     final response = await _client.post(
@@ -99,7 +102,13 @@ class ApiClient {
         'name': name,
         'photo': photo,
         'location': location,
+        'latitude': latitude,
+        'longitude': longitude,
         'description': description,
+        'storefront_images': storefrontImages,
+        'storefront_image': storefrontImages.isEmpty
+            ? ''
+            : storefrontImages.first,
         'business_card_image': businessCardImage,
       }),
     );
@@ -113,10 +122,46 @@ class ApiClient {
     return Shop.fromJson(payload);
   }
 
+  Future<Shop> updateShop(Shop shop) async {
+    final response = await _client.put(
+      _uri('/shops/${shop.id}'),
+      headers: _jsonHeaders,
+      body: jsonEncode({
+        'name': shop.name,
+        'photo': shop.photo,
+        'location': shop.location,
+        'latitude': shop.latitude,
+        'longitude': shop.longitude,
+        'description': shop.description,
+        'storefront_images': shop.storefrontImages,
+        'storefront_image': shop.storefrontPreview,
+        'business_card_image': shop.businessCardImage,
+      }),
+    );
+
+    final payload = _decodeResponse(response);
+
+    if (payload is! Map<String, dynamic>) {
+      throw const ApiException('Invalid shop response.');
+    }
+
+    return Shop.fromJson(payload);
+  }
+
+  Future<void> deleteShop(String shopId) async {
+    final response = await _client.delete(_uri('/shops/$shopId'));
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      _decodeResponse(response);
+    }
+  }
+
   Future<Product> createProduct({
     required String shopId,
     required List<String> images,
     required String amount,
+    required int quantity,
+    required String color,
     required String material,
     required String size,
     bool isFavorite = false,
@@ -128,6 +173,8 @@ class ApiClient {
         'shop_id': int.parse(shopId),
         'images': images,
         'amount': amount,
+        'quantity': quantity,
+        'color': color,
         'material': material,
         'size': size,
         'is_favorite': isFavorite,
@@ -151,6 +198,8 @@ class ApiClient {
         'shop_id': int.parse(product.shopId),
         'images': product.imagePaths,
         'amount': product.amount,
+        'quantity': product.quantity,
+        'color': product.color,
         'material': product.material,
         'size': product.size,
         'is_favorite': product.isFavorite,
