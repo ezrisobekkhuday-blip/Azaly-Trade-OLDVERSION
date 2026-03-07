@@ -210,9 +210,9 @@ String _resolveBaseUrl() {
     return configuredUrl;
   }
 
-  if (!kIsWeb && Platform.isAndroid) {
-    return 'http://10.0.2.2:8000';
+  if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    return 'http://34.173.218.175:8080';
   }
 
-  return 'http://127.0.0.1:8000';
+  return 'http://34.173.218.175:8080';
 }

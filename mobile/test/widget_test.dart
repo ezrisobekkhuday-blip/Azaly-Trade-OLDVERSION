@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:mobile/screens/placeholder_screen.dart';
+import 'package:azaly_trade/screens/placeholder_screen.dart';
 
 void main() {
   testWidgets('placeholder screen renders text', (tester) async {
