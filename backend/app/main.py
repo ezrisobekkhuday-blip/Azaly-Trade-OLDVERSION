@@ -22,6 +22,7 @@ from .schemas import (
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 UPLOADS_DIR = BASE_DIR / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def ensure_profile(db: Session) -> Profile:
@@ -61,6 +62,18 @@ def to_public_image_url(request: Request, image_path: str) -> str:
     return image_path
 
 
+def normalize_image_path(image_path: str) -> str:
+    if image_path.startswith("/uploads/"):
+        return image_path
+
+    uploads_index = image_path.find("/uploads/")
+
+    if uploads_index != -1:
+        return image_path[uploads_index:]
+
+    return image_path
+
+
 def serialize_product(request: Request, product: Product) -> ProductRead:
     return ProductRead(
       id=str(product.id),
@@ -75,10 +88,12 @@ def serialize_product(request: Request, product: Product) -> ProductRead:
 
 
 def delete_uploaded_image(image_path: str) -> None:
-    if not image_path.startswith("/uploads/"):
+    normalized_path = normalize_image_path(image_path)
+
+    if not normalized_path.startswith("/uploads/"):
         return
 
-    file_path = BASE_DIR / image_path.removeprefix("/")
+    file_path = BASE_DIR / normalized_path.removeprefix("/")
 
     if file_path.exists():
         file_path.unlink()
@@ -169,7 +184,7 @@ def create_product(
     validate_product_images(payload.images)
 
     product = Product(
-        images=payload.images,
+        images=[normalize_image_path(image) for image in payload.images],
         amount=payload.amount.strip(),
         material=payload.material.strip(),
         size=payload.size.strip(),
@@ -196,9 +211,10 @@ def update_product(
     if product is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
 
-    removed_images = [image for image in product.images if image not in payload.images]
+    normalized_images = [normalize_image_path(image) for image in payload.images]
+    removed_images = [image for image in product.images if image not in normalized_images]
 
-    product.images = payload.images
+    product.images = normalized_images
     product.amount = payload.amount.strip()
     product.material = payload.material.strip()
     product.size = payload.size.strip()

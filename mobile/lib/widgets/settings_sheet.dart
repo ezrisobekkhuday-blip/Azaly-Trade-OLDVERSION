@@ -29,17 +29,16 @@ class _SettingsSheetState extends State<SettingsSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final previewName = _controller.text.trim().isEmpty ? 'Azaly Trade' : _controller.text.trim();
+    final previewName = _controller.text.trim().isEmpty
+        ? 'Azaly Trade'
+        : _controller.text.trim();
 
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset + 16),
       child: Container(
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [
-              AppColors.background,
-              AppColors.backgroundSecondary,
-            ],
+            colors: [AppColors.background, AppColors.backgroundSecondary],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -57,15 +56,15 @@ class _SettingsSheetState extends State<SettingsSheet> {
                   Text(
                     'Имя в шапке',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   Text(
                     'Здесь можно написать своё имя или поменять текущее.',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 18),
                   TextField(
@@ -89,16 +88,14 @@ class _SettingsSheetState extends State<SettingsSheet> {
                       children: [
                         Text(
                           'Предпросмотр',
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                color: AppColors.textMuted,
-                              ),
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(color: AppColors.textMuted),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           previewName,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w800),
                         ),
                       ],
                     ),
@@ -112,7 +109,8 @@ class _SettingsSheetState extends State<SettingsSheet> {
                         foregroundColor: const Color(0xFF08110F),
                         minimumSize: const Size.fromHeight(56),
                       ),
-                      onPressed: () => Navigator.of(context).pop(_controller.text),
+                      onPressed: () =>
+                          Navigator.of(context).pop(_controller.text),
                       child: const Text('Сохранить'),
                     ),
                   ),

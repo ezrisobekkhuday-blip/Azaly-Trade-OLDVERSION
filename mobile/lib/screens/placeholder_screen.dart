@@ -21,10 +21,7 @@ class PlaceholderScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(32),
               border: Border.all(color: AppColors.border),
               gradient: const LinearGradient(
-                colors: [
-                  Color(0x2E7C92FF),
-                  Color(0x1461E5BE),
-                ],
+                colors: [Color(0x2E7C92FF), Color(0x1461E5BE)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),

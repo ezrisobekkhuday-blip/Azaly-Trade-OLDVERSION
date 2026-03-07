@@ -1,11 +1,11 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../services/api_client.dart';
 import '../state/app_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
+import '../widgets/product_image.dart';
 
 class CreateProductScreen extends StatefulWidget {
   const CreateProductScreen({
@@ -28,6 +28,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
   final TextEditingController _sizeController = TextEditingController();
 
   final List<String> _imagePaths = [];
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -78,33 +79,56 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
       return;
     }
 
-    await widget.store.createProduct(
-      imagePaths: _imagePaths,
-      amount: _amountController.text,
-      material: _materialController.text,
-      size: _sizeController.text,
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    _amountController.clear();
-    _materialController.clear();
-    _sizeController.clear();
-
     setState(() {
-      _imagePaths.clear();
+      _isSubmitting = true;
     });
 
-    widget.onOpenProducts();
-    _showMessage('Товар создан и уже лежит во вкладке «Товары».');
+    try {
+      await widget.store.createProduct(
+        imagePaths: _imagePaths,
+        amount: _amountController.text,
+        material: _materialController.text,
+        size: _sizeController.text,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      _amountController.clear();
+      _materialController.clear();
+      _sizeController.clear();
+
+      setState(() {
+        _imagePaths.clear();
+      });
+
+      widget.onOpenProducts();
+      _showMessage('Товар создан и уже лежит во вкладке «Товары».');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        describeError(
+          error,
+          fallbackMessage: 'Не удалось сохранить товар на сервере.',
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -147,7 +171,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
                         child: _ActionButton(
                           icon: Icons.photo_library_outlined,
                           label: 'Галерея',
-                          onPressed: _pickFromGallery,
+                          onPressed: _isSubmitting ? null : _pickFromGallery,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -155,7 +179,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
                         child: _ActionButton(
                           icon: Icons.photo_camera_outlined,
                           label: 'Камера',
-                          onPressed: _takePhoto,
+                          onPressed: _isSubmitting ? null : _takePhoto,
                         ),
                       ),
                     ],
@@ -168,15 +192,17 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: _imagePaths.length,
-                            separatorBuilder: (_, index) => const SizedBox(width: 12),
+                            separatorBuilder: (_, index) =>
+                                const SizedBox(width: 12),
                             itemBuilder: (context, index) {
                               final path = _imagePaths[index];
+
                               return Stack(
                                 children: [
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(24),
-                                    child: Image.file(
-                                      File(path),
+                                    child: ProductImage(
+                                      source: path,
                                       width: 124,
                                       height: 124,
                                       fit: BoxFit.cover,
@@ -187,10 +213,15 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
                                     top: 8,
                                     child: IconButton.filledTonal(
                                       style: IconButton.styleFrom(
-                                        backgroundColor: AppColors.background.withValues(alpha: 0.82),
+                                        backgroundColor: AppColors.background
+                                            .withValues(alpha: 0.82),
                                         foregroundColor: AppColors.textPrimary,
                                       ),
-                                      onPressed: () => setState(() => _imagePaths.removeAt(index)),
+                                      onPressed: _isSubmitting
+                                          ? null
+                                          : () => setState(
+                                              () => _imagePaths.removeAt(index),
+                                            ),
                                       icon: const Icon(Icons.close, size: 18),
                                     ),
                                   ),
@@ -222,10 +253,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [
-                          AppColors.primary,
-                          Color(0xFF56B7DD),
-                        ],
+                        colors: [AppColors.primary, Color(0xFF56B7DD)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -237,8 +265,10 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
                         foregroundColor: const Color(0xFF04120F),
                         shadowColor: Colors.transparent,
                         minimumSize: const Size.fromHeight(64),
+                        disabledBackgroundColor: Colors.transparent,
+                        disabledForegroundColor: const Color(0x8804120F),
                       ),
-                      onPressed: _createProduct,
+                      onPressed: _isSubmitting ? null : _createProduct,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -247,7 +277,9 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                'Создать товар',
+                                _isSubmitting
+                                    ? 'Сохраняем товар...'
+                                    : 'Создать товар',
                                 style: textTheme.titleMedium?.copyWith(
                                   color: const Color(0xFF04120F),
                                   fontWeight: FontWeight.w800,
@@ -262,7 +294,16 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
                               ),
                             ],
                           ),
-                          const Icon(Icons.arrow_forward),
+                          _isSubmitting
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.2,
+                                    color: Color(0xFF04120F),
+                                  ),
+                                )
+                              : const Icon(Icons.arrow_forward),
                         ],
                       ),
                     ),
@@ -300,10 +341,7 @@ class _HeroCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(32),
         border: Border.all(color: AppColors.border),
         gradient: const LinearGradient(
-          colors: [
-            Color(0x2E7C92FF),
-            Color(0x1461E5BE),
-          ],
+          colors: [Color(0x2E7C92FF), Color(0x1461E5BE)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -401,9 +439,7 @@ class _StatCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             label,
-            style: textTheme.bodyMedium?.copyWith(
-              color: AppColors.textMuted,
-            ),
+            style: textTheme.bodyMedium?.copyWith(color: AppColors.textMuted),
           ),
         ],
       ),
@@ -446,7 +482,7 @@ class _ActionButton extends StatelessWidget {
 
   final IconData icon;
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -455,6 +491,8 @@ class _ActionButton extends StatelessWidget {
         minimumSize: const Size.fromHeight(56),
         backgroundColor: AppColors.surfaceStrong,
         foregroundColor: AppColors.textPrimary,
+        disabledBackgroundColor: AppColors.surfaceStrong.withValues(alpha: 0.5),
+        disabledForegroundColor: AppColors.textMuted,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(22),
           side: const BorderSide(color: AppColors.border),
@@ -484,17 +522,11 @@ class _EmptyImagesCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const Icon(
-            Icons.image_outlined,
-            size: 30,
-            color: AppColors.primary,
-          ),
+          const Icon(Icons.image_outlined, size: 30, color: AppColors.primary),
           const SizedBox(height: 12),
           Text(
             'Фото пока не добавлены',
-            style: textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
+            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           Text(
@@ -529,10 +561,7 @@ class _LabeledField extends StatelessWidget {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-      ),
+      decoration: InputDecoration(labelText: label, hintText: hint),
     );
   }
 }
@@ -586,7 +615,7 @@ class _NextStepCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'После создания карточка сразу попадёт во второй раздел, где её можно открыть, редактировать и удалить.',
+                  'После создания карточка сразу попадёт во второй раздел, где её можно открыть, редактировать, добавить в избранное или удалить.',
                   style: textTheme.bodyLarge?.copyWith(
                     color: AppColors.textSecondary,
                     height: 1.55,

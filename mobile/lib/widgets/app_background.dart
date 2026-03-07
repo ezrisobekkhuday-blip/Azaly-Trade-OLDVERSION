@@ -59,13 +59,7 @@ class _GlowBlob extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: color,
-            blurRadius: 60,
-            spreadRadius: 12,
-          ),
-        ],
+        boxShadow: [BoxShadow(color: color, blurRadius: 60, spreadRadius: 12)],
       ),
     );
   }

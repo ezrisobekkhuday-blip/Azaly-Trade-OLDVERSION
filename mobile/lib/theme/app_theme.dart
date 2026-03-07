@@ -52,10 +52,7 @@ ThemeData buildAppTheme() {
       indicatorColor: AppColors.surfaceStrong,
       elevation: 0,
       labelTextStyle: WidgetStateProperty.all(
-        GoogleFonts.manrope(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
+        GoogleFonts.manrope(fontSize: 12, fontWeight: FontWeight.w700),
       ),
       iconTheme: WidgetStateProperty.resolveWith(
         (states) => IconThemeData(

@@ -53,15 +53,20 @@ class Product {
   }
 
   factory Product.fromJson(Map<String, dynamic> json) {
+    final rawImages = json['imagePaths'] ?? json['images'];
+    final rawCreatedAt = json['createdAt'] ?? json['created_at'];
+    final rawIsFavorite = json['isFavorite'] ?? json['is_favorite'];
+
     return Product(
-      id: json['id'] as String? ?? '',
-      imagePaths: List<String>.from(json['imagePaths'] as List<dynamic>? ?? const []),
+      id: '${json['id'] ?? ''}',
+      imagePaths: List<String>.from(rawImages as List<dynamic>? ?? const []),
       amount: json['amount'] as String? ?? '',
       material: json['material'] as String? ?? '',
       size: json['size'] as String? ?? '',
       status: json['status'] as String? ?? 'new',
-      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
-      isFavorite: json['isFavorite'] as bool? ?? false,
+      createdAt:
+          DateTime.tryParse(rawCreatedAt as String? ?? '') ?? DateTime.now(),
+      isFavorite: rawIsFavorite as bool? ?? false,
     );
   }
 }
@@ -73,5 +78,5 @@ String formatProductDate(DateTime date) {
   final hour = date.hour.toString().padLeft(2, '0');
   final minute = date.minute.toString().padLeft(2, '0');
 
-  return '$day.$month.$year • $hour:$minute';
+  return '$day.$month.$year | $hour:$minute';
 }

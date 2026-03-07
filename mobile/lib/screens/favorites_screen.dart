@@ -4,10 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/product.dart';
+import '../services/api_client.dart';
 import '../state/app_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
-import 'products_screen.dart';
+import '../widgets/product_image.dart';
+import '../widgets/section_cards.dart';
+import 'photo_viewer_page.dart';
 
 class FavoritesScreen extends StatelessWidget {
   const FavoritesScreen({super.key, required this.store});
@@ -15,22 +18,39 @@ class FavoritesScreen extends StatelessWidget {
   final AppStore store;
 
   Future<void> _toggleFavorite(BuildContext context, Product product) async {
-    await store.toggleFavorite(product.id);
+    try {
+      await store.toggleFavorite(product.id);
 
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Товар убран из избранного.')),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Товар убран из избранного.')),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              describeError(
+                error,
+                fallbackMessage: 'Не удалось обновить избранное.',
+              ),
+            ),
+          ),
+        );
+      }
     }
   }
 
-  Future<void> _openViewer(BuildContext context, Product product, int initialIndex) async {
+  Future<void> _openViewer(
+    BuildContext context,
+    Product product,
+    int initialIndex,
+  ) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (context) => PhotoViewerPage(
-          product: product,
-          initialIndex: initialIndex,
-        ),
+        builder: (_) =>
+            PhotoViewerPage(product: product, initialIndex: initialIndex),
         fullscreenDialog: true,
       ),
     );
@@ -38,16 +58,17 @@ class FavoritesScreen extends StatelessWidget {
 
   Future<void> _shareProduct(BuildContext context, Product product) async {
     final files = product.imagePaths
-        .where((path) => File(path).existsSync())
+        .where((path) => !isRemoteImageSource(path) && File(path).existsSync())
         .map(XFile.new)
         .toList();
-
+    final remoteImages = product.imagePaths.where(isRemoteImageSource).toList();
     final summary = [
       'Избранный товар из Azaly Trade',
       'Сумма: ${product.amount.isEmpty ? 'Не указано' : product.amount}',
       'Материал: ${product.material.isEmpty ? 'Не указано' : product.material}',
       'Размер: ${product.size.isEmpty ? 'Не указано' : product.size}',
       'Статус: ${product.status}',
+      if (remoteImages.isNotEmpty) ...['Фото:', ...remoteImages],
     ].join('\n');
 
     try {
@@ -63,14 +84,18 @@ class FavoritesScreen extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Открылось меню "Поделиться". Можно выбрать Telegram.'),
+            content: Text(
+              'Открылось меню «Поделиться». Можно выбрать Telegram.',
+            ),
           ),
         );
       }
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось открыть меню "Поделиться".')),
+          const SnackBar(
+            content: Text('Не удалось открыть меню «Поделиться».'),
+          ),
         );
       }
     }
@@ -79,7 +104,6 @@ class FavoritesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final favorites = store.favoriteProducts;
-    final textTheme = Theme.of(context).textTheme;
 
     return AppBackground(
       child: SafeArea(
@@ -87,139 +111,33 @@ class FavoritesScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 132),
           children: [
-            Container(
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(color: AppColors.border),
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0x24FF7D93),
-                    Color(0x147C92FF),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x33000000),
-                    blurRadius: 28,
-                    offset: Offset(0, 18),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.danger.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      'FAVORITES',
-                      style: textTheme.labelLarge?.copyWith(
-                        color: AppColors.danger,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    'Избранные',
-                    style: textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Сюда попадают любимые товары. Здесь можно открыть фото и отправить карточку через Telegram или другое приложение.',
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: AppColors.textSecondary,
-                      height: 1.55,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0x73060A14),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          favorites.length.toString(),
-                          style: textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Любимых товаров',
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            SectionHeroCard(
+              badge: 'FAVORITES',
+              badgeColor: AppColors.danger,
+              title: 'Избранные',
+              description:
+                  'Сюда попадают любимые товары. Здесь можно открыть фото и отправить карточку через Telegram или другое приложение.',
+              count: favorites.length,
+              countLabel: 'Любимых товаров',
+              colors: const [Color(0x24FF7D93), Color(0x147C92FF)],
             ),
             const SizedBox(height: 18),
             if (favorites.isEmpty)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(32),
-                  border: Border.all(color: AppColors.border),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x33000000),
-                      blurRadius: 28,
-                      offset: Offset(0, 18),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    const Icon(
-                      Icons.favorite_border,
-                      size: 36,
-                      color: AppColors.danger,
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Пока нет избранного',
-                      style: textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Нажми на сердечко у товара во второй вкладке, и он появится здесь.',
-                      textAlign: TextAlign.center,
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: AppColors.textSecondary,
-                        height: 1.55,
-                      ),
-                    ),
-                  ],
-                ),
+              const EmptyStateCard(
+                icon: Icons.favorite_border,
+                iconColor: AppColors.danger,
+                title: 'Пока нет избранного',
+                description:
+                    'Нажми на сердечко у товара во второй вкладке, и он появится здесь.',
               )
             else
               ...favorites.map(
                 (product) => Padding(
                   padding: const EdgeInsets.only(bottom: 16),
-                  child: FavoriteProductCard(
+                  child: _FavoriteCard(
                     product: product,
-                    onOpenImage: (index) => _openViewer(context, product, index),
+                    onOpenImage: (index) =>
+                        _openViewer(context, product, index),
                     onShare: () => _shareProduct(context, product),
                     onUnfavorite: () => _toggleFavorite(context, product),
                   ),
@@ -232,9 +150,8 @@ class FavoritesScreen extends StatelessWidget {
   }
 }
 
-class FavoriteProductCard extends StatelessWidget {
-  const FavoriteProductCard({
-    super.key,
+class _FavoriteCard extends StatelessWidget {
+  const _FavoriteCard({
     required this.product,
     required this.onOpenImage,
     required this.onShare,
@@ -270,7 +187,10 @@ class FavoriteProductCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.danger.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
@@ -280,7 +200,6 @@ class FavoriteProductCard extends StatelessWidget {
                   style: textTheme.labelLarge?.copyWith(
                     color: AppColors.danger,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 0.8,
                   ),
                 ),
               ),
@@ -292,10 +211,7 @@ class FavoriteProductCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              const Icon(
-                Icons.favorite,
-                color: AppColors.danger,
-              ),
+              const Icon(Icons.favorite, color: AppColors.danger),
             ],
           ),
           const SizedBox(height: 16),
@@ -305,21 +221,18 @@ class FavoriteProductCard extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               itemCount: product.imagePaths.length,
               separatorBuilder: (_, index) => const SizedBox(width: 12),
-              itemBuilder: (context, index) {
-                return InkWell(
+              itemBuilder: (context, index) => InkWell(
+                onTap: () => onOpenImage(index),
+                borderRadius: BorderRadius.circular(24),
+                child: ClipRRect(
                   borderRadius: BorderRadius.circular(24),
-                  onTap: () => onOpenImage(index),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: Image.file(
-                      File(product.imagePaths[index]),
-                      width: 110,
-                      height: 110,
-                      fit: BoxFit.cover,
-                    ),
+                  child: ProductImage(
+                    source: product.imagePaths[index],
+                    width: 110,
+                    height: 110,
                   ),
-                );
-              },
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -335,7 +248,9 @@ class FavoriteProductCard extends StatelessWidget {
               Expanded(
                 child: _InfoTile(
                   label: 'Материал',
-                  value: product.material.isEmpty ? 'Не указано' : product.material,
+                  value: product.material.isEmpty
+                      ? 'Не указано'
+                      : product.material,
                 ),
               ),
               const SizedBox(width: 10),
@@ -352,15 +267,11 @@ class FavoriteProductCard extends StatelessWidget {
             children: [
               Expanded(
                 child: FilledButton.icon(
+                  onPressed: onShare,
                   style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(52),
                     backgroundColor: AppColors.primary,
                     foregroundColor: const Color(0xFF08110F),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(22),
-                    ),
                   ),
-                  onPressed: onShare,
                   icon: const Icon(Icons.share_outlined),
                   label: const Text('Поделиться'),
                 ),
@@ -368,15 +279,6 @@ class FavoriteProductCard extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton.tonalIcon(
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(52),
-                    backgroundColor: AppColors.surfaceStrong,
-                    foregroundColor: AppColors.textPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(22),
-                      side: const BorderSide(color: AppColors.border),
-                    ),
-                  ),
                   onPressed: onUnfavorite,
                   icon: const Icon(Icons.heart_broken_outlined),
                   label: const Text('Убрать'),
@@ -411,16 +313,12 @@ class _InfoTile extends StatelessWidget {
         children: [
           Text(
             label,
-            style: textTheme.bodySmall?.copyWith(
-              color: AppColors.textMuted,
-            ),
+            style: textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
           ),
           const SizedBox(height: 6),
           Text(
             value,
-            style: textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
       ),

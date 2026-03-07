@@ -1,13 +1,12 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/product.dart';
+import '../services/api_client.dart';
 
 class AppStore extends ChangeNotifier {
-  static const _storageKey = 'azaly_trade_flutter_state';
+  AppStore({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
 
+  final ApiClient _apiClient;
   bool _isReady = false;
   String _displayName = 'Azaly Trade';
   final List<Product> _products = [];
@@ -22,23 +21,11 @@ class AppStore extends ChangeNotifier {
 
   Future<void> load() async {
     try {
-      final preferences = await SharedPreferences.getInstance();
-      final rawState = preferences.getString(_storageKey);
-
-      if (rawState != null && rawState.isNotEmpty) {
-        final decoded = jsonDecode(rawState) as Map<String, dynamic>;
-        final storedName = (decoded['displayName'] as String?)?.trim() ?? '';
-        final storedProducts = decoded['products'] as List<dynamic>? ?? const [];
-
-        _displayName = storedName.isEmpty ? 'Azaly Trade' : storedName;
-        _products
-          ..clear()
-          ..addAll(
-            storedProducts
-                .whereType<Map<String, dynamic>>()
-                .map(Product.fromJson),
-          );
-      }
+      final bootstrap = await _apiClient.fetchBootstrap();
+      _displayName = bootstrap.displayName;
+      _products
+        ..clear()
+        ..addAll(bootstrap.products);
     } catch (_) {
       _displayName = 'Azaly Trade';
       _products.clear();
@@ -49,9 +36,12 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> updateName(String value) async {
-    _displayName = value.trim().isEmpty ? 'Azaly Trade' : value.trim();
+    final updatedName = await _apiClient.updateProfileName(
+      value.trim().isEmpty ? 'Azaly Trade' : value.trim(),
+    );
+
+    _displayName = updatedName;
     notifyListeners();
-    await _persist();
   }
 
   Future<void> createProduct({
@@ -60,40 +50,40 @@ class AppStore extends ChangeNotifier {
     required String material,
     required String size,
   }) async {
-    _products.insert(
-      0,
-      Product(
-        id: '${DateTime.now().millisecondsSinceEpoch}',
-        imagePaths: List<String>.from(imagePaths),
-        amount: amount.trim(),
-        material: material.trim(),
-        size: size.trim(),
-        status: 'new',
-        createdAt: DateTime.now(),
-        isFavorite: false,
-      ),
+    final preparedImages = await _prepareImagePaths(imagePaths);
+    final createdProduct = await _apiClient.createProduct(
+      images: preparedImages,
+      amount: amount.trim(),
+      material: material.trim(),
+      size: size.trim(),
     );
 
+    _products.insert(0, createdProduct);
     notifyListeners();
-    await _persist();
   }
 
   Future<void> updateProduct(Product updatedProduct) async {
-    final index = _products.indexWhere((product) => product.id == updatedProduct.id);
+    final index = _products.indexWhere(
+      (product) => product.id == updatedProduct.id,
+    );
 
     if (index == -1) {
       return;
     }
 
-    _products[index] = updatedProduct;
+    final preparedProduct = updatedProduct.copyWith(
+      imagePaths: await _prepareImagePaths(updatedProduct.imagePaths),
+    );
+    final serverProduct = await _apiClient.updateProduct(preparedProduct);
+
+    _products[index] = serverProduct;
     notifyListeners();
-    await _persist();
   }
 
   Future<void> deleteProduct(String productId) async {
+    await _apiClient.deleteProduct(productId);
     _products.removeWhere((product) => product.id == productId);
     notifyListeners();
-    await _persist();
   }
 
   Future<void> toggleFavorite(String productId) async {
@@ -104,18 +94,42 @@ class AppStore extends ChangeNotifier {
     }
 
     final product = _products[index];
-    _products[index] = product.copyWith(isFavorite: !product.isFavorite);
+    final serverProduct = await _apiClient.updateProduct(
+      product.copyWith(isFavorite: !product.isFavorite),
+    );
+
+    _products[index] = serverProduct;
     notifyListeners();
-    await _persist();
   }
 
-  Future<void> _persist() async {
-    final preferences = await SharedPreferences.getInstance();
-    final encoded = jsonEncode({
-      'displayName': _displayName,
-      'products': _products.map((product) => product.toJson()).toList(),
-    });
+  Future<List<String>> _prepareImagePaths(List<String> imagePaths) async {
+    final localPaths = imagePaths
+        .where(
+          (path) => !path.startsWith('http://') && !path.startsWith('https://'),
+        )
+        .toList();
 
-    await preferences.setString(_storageKey, encoded);
+    if (localPaths.isEmpty) {
+      return List<String>.from(imagePaths);
+    }
+
+    final uploadedPaths = await _apiClient.uploadImages(localPaths);
+    var uploadedIndex = 0;
+
+    return imagePaths.map((path) {
+      if (path.startsWith('http://') || path.startsWith('https://')) {
+        return path;
+      }
+
+      final remotePath = uploadedPaths[uploadedIndex];
+      uploadedIndex += 1;
+      return remotePath;
+    }).toList();
+  }
+
+  @override
+  void dispose() {
+    _apiClient.dispose();
+    super.dispose();
   }
 }

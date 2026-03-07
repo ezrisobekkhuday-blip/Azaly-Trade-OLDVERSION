@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'screens/create_product_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/products_screen.dart';
+import 'services/api_client.dart';
 import 'state/app_store.dart';
 import 'theme/app_theme.dart';
 import 'widgets/app_background.dart';
@@ -70,11 +71,28 @@ class _HomeShellState extends State<HomeShell> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => SettingsSheet(initialName: widget.store.displayName),
+      builder: (_) => SettingsSheet(initialName: widget.store.displayName),
     );
 
-    if (updatedName != null) {
+    if (updatedName == null || !mounted) {
+      return;
+    }
+
+    try {
       await widget.store.updateName(updatedName);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              describeError(
+                error,
+                fallbackMessage: 'Не удалось сохранить имя на сервере.',
+              ),
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -107,9 +125,7 @@ class _HomeShellState extends State<HomeShell> {
       body: widget.store.isReady
           ? IndexedStack(index: _selectedIndex, children: screens)
           : const AppBackground(
-              child: Center(
-                child: CircularProgressIndicator(),
-              ),
+              child: Center(child: CircularProgressIndicator()),
             ),
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
@@ -117,7 +133,8 @@ class _HomeShellState extends State<HomeShell> {
           borderRadius: BorderRadius.circular(28),
           child: NavigationBar(
             selectedIndex: _selectedIndex,
-            onDestinationSelected: (value) => setState(() => _selectedIndex = value),
+            onDestinationSelected: (value) =>
+                setState(() => _selectedIndex = value),
             destinations: const [
               NavigationDestination(
                 icon: Icon(Icons.add_circle_outline),
