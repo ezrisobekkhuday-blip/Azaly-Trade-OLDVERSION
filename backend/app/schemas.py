@@ -18,17 +18,17 @@ class ProfileUpdate(BaseModel):
 
 
 class ShopCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
+    name: str = Field(default="", max_length=120)
     photo: str = Field(min_length=1)
-    location: str = Field(min_length=1, max_length=255)
+    location: str = Field(default="", max_length=255)
     description: str = ""
     business_card_image: str = ""
 
 
 class ShopUpdate(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
+    name: str = Field(default="", max_length=120)
     photo: str = Field(min_length=1)
-    location: str = Field(min_length=1, max_length=255)
+    location: str = Field(default="", max_length=255)
     description: str = ""
     business_card_image: str = ""
 

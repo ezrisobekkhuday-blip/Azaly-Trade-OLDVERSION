@@ -211,6 +211,10 @@ app.add_middleware(
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 
+def normalize_shop_name(value: str) -> str:
+    return value.strip() or "Новый магазин"
+
+
 @app.get("/health", response_model=HealthResponse)
 def healthcheck() -> HealthResponse:
     return HealthResponse(status="ok")
@@ -266,7 +270,7 @@ def create_shop(
     validate_shop_photo(payload.photo)
 
     shop = Shop(
-        name=payload.name.strip(),
+        name=normalize_shop_name(payload.name),
         photo=normalize_image_path(payload.photo.strip()),
         location=payload.location.strip(),
         description=payload.description.strip(),
@@ -304,7 +308,7 @@ def update_shop(
     if shop.business_card_image and shop.business_card_image != new_business_card:
         removed_images.append(shop.business_card_image)
 
-    shop.name = payload.name.strip()
+    shop.name = normalize_shop_name(payload.name)
     shop.photo = new_photo
     shop.location = payload.location.strip()
     shop.description = payload.description.strip()
