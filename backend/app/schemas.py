@@ -17,7 +17,35 @@ class ProfileUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
 
 
+class ShopCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    photo: str = Field(min_length=1)
+    location: str = Field(min_length=1, max_length=255)
+    description: str = ""
+    business_card_image: str = ""
+
+
+class ShopUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    photo: str = Field(min_length=1)
+    location: str = Field(min_length=1, max_length=255)
+    description: str = ""
+    business_card_image: str = ""
+
+
+class ShopRead(BaseModel):
+    id: str
+    name: str
+    photo: str
+    location: str
+    description: str
+    business_card_image: str
+    products_count: int
+    created_at: datetime
+
+
 class ProductCreate(BaseModel):
+    shop_id: int
     images: list[str] = Field(default_factory=list)
     amount: str = ""
     material: str = ""
@@ -26,6 +54,7 @@ class ProductCreate(BaseModel):
 
 
 class ProductUpdate(BaseModel):
+    shop_id: int
     images: list[str] = Field(default_factory=list)
     amount: str = ""
     material: str = ""
@@ -35,6 +64,8 @@ class ProductUpdate(BaseModel):
 
 class ProductRead(BaseModel):
     id: str
+    shop_id: str
+    shop_name: str
     images: list[str]
     amount: str
     material: str
