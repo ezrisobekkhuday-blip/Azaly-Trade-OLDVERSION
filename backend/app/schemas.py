@@ -60,6 +60,8 @@ class ProductCreate(BaseModel):
     shop_id: int
     images: list[str] = Field(default_factory=list)
     amount: str = ""
+    quantity: int = Field(default=1, ge=1)
+    color: str = ""
     material: str = ""
     size: str = ""
     is_favorite: bool = False
@@ -69,6 +71,8 @@ class ProductUpdate(BaseModel):
     shop_id: int
     images: list[str] = Field(default_factory=list)
     amount: str = ""
+    quantity: int = Field(default=1, ge=1)
+    color: str = ""
     material: str = ""
     size: str = ""
     is_favorite: bool = False
@@ -80,6 +84,8 @@ class ProductRead(BaseModel):
     shop_name: str
     images: list[str]
     amount: str
+    quantity: int
+    color: str
     material: str
     size: str
     status: str

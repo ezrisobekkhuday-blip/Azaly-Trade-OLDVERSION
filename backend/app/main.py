@@ -57,6 +57,16 @@ def ensure_product_columns() -> None:
         if "shop_id" not in columns:
             connection.execute(text("ALTER TABLE products ADD COLUMN shop_id INTEGER"))
 
+        if "quantity" not in columns:
+            connection.execute(
+                text("ALTER TABLE products ADD COLUMN quantity INTEGER DEFAULT 1 NOT NULL")
+            )
+
+        if "color" not in columns:
+            connection.execute(
+                text("ALTER TABLE products ADD COLUMN color VARCHAR(80) DEFAULT '' NOT NULL")
+            )
+
 
 def ensure_shop_columns() -> None:
     inspector = inspect(engine)
@@ -210,6 +220,8 @@ def serialize_product(request: Request, product: Product, shop_name: str = "") -
         shop_name=shop_name,
         images=[to_public_image_url(request, image) for image in product.images],
         amount=product.amount,
+        quantity=product.quantity,
+        color=product.color,
         material=product.material,
         size=product.size,
         status=product.status,
@@ -281,7 +293,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Azaly Trade API", version="0.4.0", lifespan=lifespan)
+app = FastAPI(title="Azaly Trade API", version="0.5.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -484,6 +496,8 @@ def create_product(
         shop_id=shop.id,
         images=[normalize_image_path(image) for image in payload.images],
         amount=payload.amount.strip(),
+        quantity=max(1, payload.quantity),
+        color=payload.color.strip(),
         material=payload.material.strip(),
         size=payload.size.strip(),
         status="new",
@@ -516,6 +530,8 @@ def update_product(
     product.shop_id = shop.id
     product.images = normalized_images
     product.amount = payload.amount.strip()
+    product.quantity = max(1, payload.quantity)
+    product.color = payload.color.strip()
     product.material = payload.material.strip()
     product.size = payload.size.strip()
     product.is_favorite = payload.is_favorite

@@ -36,6 +36,8 @@ class Product(Base):
     shop_id: Mapped[int | None] = mapped_column(ForeignKey("shops.id"), nullable=True)
     images: Mapped[list[str]] = mapped_column(JSON, default=list)
     amount: Mapped[str] = mapped_column(String(120), default="")
+    quantity: Mapped[int] = mapped_column(default=1)
+    color: Mapped[str] = mapped_column(String(80), default="")
     material: Mapped[str] = mapped_column(String(120), default="")
     size: Mapped[str] = mapped_column(String(120), default="")
     status: Mapped[str] = mapped_column(String(32), default="new")
