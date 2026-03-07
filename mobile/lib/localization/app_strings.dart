@@ -123,6 +123,8 @@ class AppStrings {
     'gallery': {'ru': 'Галерея', 'en': 'Gallery', 'zh': '相册'},
     'camera': {'ru': 'Камера', 'en': 'Camera', 'zh': '相机'},
     'close': {'ru': 'Закрыть', 'en': 'Close', 'zh': '关闭'},
+    'expand': {'ru': 'Развернуть', 'en': 'Expand', 'zh': '展开'},
+    'collapse': {'ru': 'Свернуть', 'en': 'Collapse', 'zh': '收起'},
     'preview': {'ru': 'Предпросмотр', 'en': 'Preview', 'zh': '预览'},
     'language': {'ru': 'Язык', 'en': 'Language', 'zh': '语言'},
     'otherOptions': {
@@ -248,6 +250,17 @@ class AppStrings {
     },
     'photoReady': {'ru': 'Фото готово', 'en': 'Photo ready', 'zh': '照片已就绪'},
     'totalShops': {'ru': 'Всего магазинов', 'en': 'Total shops', 'zh': '店铺总数'},
+    'totalPiecesLabel': {'ru': 'Всего штук', 'en': 'Total qty', 'zh': '总件数'},
+    'grossTotalWithRateLabel': {
+      'ru': 'Сумма без 10%',
+      'en': 'Subtotal before 10%',
+      'zh': '未扣10%总额',
+    },
+    'netTotalWithRateLabel': {
+      'ru': 'Итог с 10%',
+      'en': 'Total after 10%',
+      'zh': '扣10%后总额',
+    },
     'chooseOrTakePhoto': {
       'ru': 'Можно выбрать из галереи или сфотографировать.',
       'en': 'You can pick from gallery or take a photo.',
@@ -425,6 +438,11 @@ class AppStrings {
       'en': 'Add photos, purchase price, quantity, and required fields.',
       'zh': '添加照片、进货价、数量和需要的字段。',
     },
+    'purchaseCollapsedHint': {
+      'ru': 'Форма скрыта. Нажми стрелку, чтобы снова открыть.',
+      'en': 'The form is hidden. Tap the arrow to open it again.',
+      'zh': '表单已隐藏，点击箭头再次打开。',
+    },
     'cannotOpenGallery': {
       'ru': 'Не удалось открыть галерею.',
       'en': 'Failed to open the gallery.',
@@ -484,6 +502,11 @@ class AppStrings {
       'ru': 'Товар перенесён в избранные.',
       'en': 'Product moved to favorites.',
       'zh': '商品已移到收藏。',
+    },
+    'favoriteMarked': {
+      'ru': 'Товар отмечен как избранный.',
+      'en': 'Product marked as favorite.',
+      'zh': '商品已标记为收藏。',
     },
     'cannotUpdateFavorite': {
       'ru': 'Не удалось обновить избранное.',
@@ -590,6 +613,7 @@ class AppStrings {
     'priceLabel': {'ru': 'Цена', 'en': 'Price', 'zh': '价格'},
     'totalLabel': {'ru': 'Итог', 'en': 'Total', 'zh': '总计'},
     'piecesLabel': {'ru': 'Штук', 'en': 'Qty', 'zh': '件数'},
+    'piecesShort': {'ru': 'шт', 'en': 'pcs', 'zh': '件'},
     'cannotOpenRoute': {
       'ru': 'Не удалось открыть маршрут.',
       'en': 'Failed to open the route.',

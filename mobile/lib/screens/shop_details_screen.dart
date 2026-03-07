@@ -49,6 +49,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
   final List<String> _imagePaths = [];
   int _quantity = 1;
   bool _isSubmitting = false;
+  bool _isPurchaseFormExpanded = true;
 
   Shop? get _shop => widget.store.shopById(widget.shopId);
 
@@ -170,6 +171,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         _imagePaths.clear();
         _quantity = 1;
         _quantityController.text = '1';
+        _isPurchaseFormExpanded = false;
       });
       _showMessage(AppStrings.of(context).t('productCreated'));
     } catch (error) {
@@ -272,7 +274,12 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     try {
       await widget.store.toggleFavorite(product.id);
       if (mounted) {
-        _showMessage(AppStrings.of(context).t('movedToFavorites'));
+        final strings = AppStrings.of(context);
+        _showMessage(
+          product.isFavorite
+              ? strings.t('favoriteRemoved')
+              : strings.t('favoriteMarked'),
+        );
       }
     } catch (error) {
       if (!mounted) {
@@ -332,61 +339,30 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final shop = _shop;
-    final strings = AppStrings.of(context);
+  void _togglePurchaseForm() {
+    setState(() {
+      _isPurchaseFormExpanded = !_isPurchaseFormExpanded;
+    });
+  }
 
-    if (shop == null) {
-      return Scaffold(
-        appBar: AppBar(title: Text(strings.t('shopsHeroTitle'))),
-        body: AppBackground(
-          child: Center(child: Text(strings.t('shopNotFound'))),
-        ),
-      );
-    }
-
-    final products = widget.store.productsForShop(shop.id);
-    final textTheme = Theme.of(context).textTheme;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(shop.name.isEmpty ? strings.t('newShop') : shop.name),
+  Widget _buildPurchaseComposer(
+    BuildContext context,
+    AppStrings strings,
+    TextTheme textTheme,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: AppColors.border),
       ),
-      body: AppBackground(
-        child: SafeArea(
-          top: false,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              _ShopHero(
-                shop: shop,
-                onOpenPhoto: shop.photo.isEmpty
-                    ? null
-                    : () =>
-                          _openImagePreview(strings.t('shopPhoto'), shop.photo),
-                onOpenStorefront: shop.storefrontImages.isEmpty
-                    ? null
-                    : (index) => _openImageGallery(
-                        strings.t('storefrontPhotos'),
-                        shop.storefrontImages,
-                        initialIndex: index,
-                      ),
-                onOpenCard: shop.businessCardImage.isEmpty
-                    ? null
-                    : () => _openImagePreview(
-                        strings.t('businessCardShort'),
-                        shop.businessCardImage,
-                      ),
-              ),
-              const SizedBox(height: 18),
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: AppColors.border),
-                ),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -399,180 +375,270 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                     const SizedBox(height: 6),
                     Text(
                       strings.t('purchaseDescription'),
-                      maxLines: 2,
+                      maxLines: _isPurchaseFormExpanded ? 2 : 1,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.bodyMedium?.copyWith(
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton.tonalIcon(
-                            onPressed: _isSubmitting ? null : _pickFromGallery,
-                            icon: const Icon(Icons.photo_library_outlined),
-                            label: Text(strings.t('gallery')),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton.tonalIcon(
-                            onPressed: _isSubmitting ? null : _takePhoto,
-                            icon: const Icon(Icons.photo_camera_outlined),
-                            label: Text(strings.t('camera')),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    _imagePaths.isEmpty
-                        ? const _EmptyProductImages()
-                        : SizedBox(
-                            height: 148,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _imagePaths.length,
-                              separatorBuilder: (_, index) =>
-                                  const SizedBox(width: 12),
-                              itemBuilder: (context, index) {
-                                final path = _imagePaths[index];
-
-                                return ProductThumbnailCard(
-                                  source: path,
-                                  onRemove: _isSubmitting
-                                      ? null
-                                      : () => setState(
-                                          () => _imagePaths.removeAt(index),
-                                        ),
-                                );
-                              },
-                            ),
-                          ),
-                    const SizedBox(height: 18),
-                    _PurchaseSummaryCard(
-                      amount: _amountController.text,
-                      quantity: _quantity,
-                      total: _draftTotal,
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: _amountController,
-                      onChanged: (_) => setState(() {}),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: strings.t('purchasePriceLabel'),
-                        hintText: strings.t('purchasePriceHint'),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              IconButton.filledTonal(
+                onPressed: _togglePurchaseForm,
+                tooltip: _isPurchaseFormExpanded
+                    ? strings.t('collapse')
+                    : strings.t('expand'),
+                icon: Icon(
+                  _isPurchaseFormExpanded
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                ),
+              ),
+            ],
+          ),
+          AnimatedCrossFade(
+            firstChild: Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: Text(
+                strings.t('purchaseCollapsedHint'),
+                style: textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            secondChild: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.tonalIcon(
+                        onPressed: _isSubmitting ? null : _pickFromGallery,
+                        icon: const Icon(Icons.photo_library_outlined),
+                        label: Text(strings.t('gallery')),
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    _QuantityStepper(
-                      controller: _quantityController,
-                      quantity: _quantity,
-                      onChanged: _syncQuantityFromText,
-                    ),
-                    const SizedBox(height: 14),
-                    SuggestionField(
-                      controller: _colorController,
-                      label: strings.t('colorLabel'),
-                      hint: strings.t('colorHint'),
-                      suggestions: localizedColorSuggestions(strings.language),
-                      quickGroups: [
-                        SuggestionGroup(
-                          label: strings.t('popularColors'),
-                          items: localizedPopularColorSuggestions(
-                            strings.language,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    SuggestionField(
-                      controller: _materialController,
-                      label: strings.t('materialLabel'),
-                      hint: strings.t('materialHint'),
-                      suggestions: localizedMaterialSuggestions(
-                        strings.language,
-                      ),
-                      quickGroups: [
-                        SuggestionGroup(
-                          label: strings.t('popular'),
-                          items: localizedPopularMaterialSuggestions(
-                            strings.language,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    SuggestionField(
-                      controller: _sizeController,
-                      label: strings.t('sizeLabel'),
-                      hint: strings.t('sizeHint'),
-                      suggestions: localizedSizeSuggestions(strings.language),
-                      quickGroups: [
-                        SuggestionGroup(
-                          label: strings.t('alphaSizes'),
-                          items: alphaSizeSuggestions,
-                        ),
-                        SuggestionGroup(
-                          label: strings.t('numericSizes'),
-                          items: numericSizeSuggestions,
-                        ),
-                        SuggestionGroup(
-                          label: strings.t('specialSizes'),
-                          items: localizedSpecialSizeSuggestions(
-                            strings.language,
-                          ),
-                        ),
-                      ],
-                      allowMultiSelect: true,
-                    ),
-                    const SizedBox(height: 18),
-                    FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: const Color(0xFF08110F),
-                        minimumSize: const Size.fromHeight(60),
-                      ),
-                      onPressed: _isSubmitting ? null : _createProduct,
-                      child: Text(
-                        _isSubmitting
-                            ? strings.t('savingPurchase')
-                            : strings.t('savePurchase'),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton.tonalIcon(
+                        onPressed: _isSubmitting ? null : _takePhoto,
+                        icon: const Icon(Icons.photo_camera_outlined),
+                        label: Text(strings.t('camera')),
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                strings.t('shopPurchases'),
-                style: textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
+                const SizedBox(height: 18),
+                _imagePaths.isEmpty
+                    ? const _EmptyProductImages()
+                    : SizedBox(
+                        height: 148,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _imagePaths.length,
+                          separatorBuilder: (_, index) =>
+                              const SizedBox(width: 12),
+                          itemBuilder: (context, index) {
+                            final path = _imagePaths[index];
+
+                            return ProductThumbnailCard(
+                              source: path,
+                              onRemove: _isSubmitting
+                                  ? null
+                                  : () => setState(
+                                      () => _imagePaths.removeAt(index),
+                                    ),
+                            );
+                          },
+                        ),
+                      ),
+                const SizedBox(height: 18),
+                _PurchaseSummaryCard(
+                  amount: _amountController.text,
+                  quantity: _quantity,
+                  total: _draftTotal,
                 ),
-              ),
-              const SizedBox(height: 12),
-              if (products.isEmpty)
-                const _EmptyShopProducts()
-              else
-                ...products.map(
-                  (product) => Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: _ShopProductCard(
-                      product: product,
-                      onEdit: () => _openEditor(product),
-                      onDelete: () => _deleteProduct(product),
-                      onToggleFavorite: () => _toggleFavorite(product),
-                      onOpenImage: (index) => _openViewer(product, index),
-                    ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _amountController,
+                  onChanged: (_) => setState(() {}),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: strings.t('purchasePriceLabel'),
+                    hintText: strings.t('purchasePriceHint'),
                   ),
                 ),
-            ],
+                const SizedBox(height: 14),
+                _QuantityStepper(
+                  controller: _quantityController,
+                  quantity: _quantity,
+                  onChanged: _syncQuantityFromText,
+                ),
+                const SizedBox(height: 14),
+                SuggestionField(
+                  controller: _colorController,
+                  label: strings.t('colorLabel'),
+                  hint: strings.t('colorHint'),
+                  suggestions: localizedColorSuggestions(strings.language),
+                  quickGroups: [
+                    SuggestionGroup(
+                      label: strings.t('popularColors'),
+                      items: localizedPopularColorSuggestions(strings.language),
+                    ),
+                  ],
+                  allowMultiSelect: true,
+                ),
+                const SizedBox(height: 14),
+                SuggestionField(
+                  controller: _materialController,
+                  label: strings.t('materialLabel'),
+                  hint: strings.t('materialHint'),
+                  suggestions: localizedMaterialSuggestions(strings.language),
+                  quickGroups: [
+                    SuggestionGroup(
+                      label: strings.t('popular'),
+                      items: localizedPopularMaterialSuggestions(
+                        strings.language,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                SuggestionField(
+                  controller: _sizeController,
+                  label: strings.t('sizeLabel'),
+                  hint: strings.t('sizeHint'),
+                  suggestions: localizedSizeSuggestions(strings.language),
+                  quickGroups: [
+                    SuggestionGroup(
+                      label: strings.t('alphaSizes'),
+                      items: alphaSizeSuggestions,
+                    ),
+                    SuggestionGroup(
+                      label: strings.t('numericSizes'),
+                      items: numericSizeSuggestions,
+                    ),
+                    SuggestionGroup(
+                      label: strings.t('specialSizes'),
+                      items: localizedSpecialSizeSuggestions(strings.language),
+                    ),
+                  ],
+                  allowMultiSelect: true,
+                ),
+                const SizedBox(height: 18),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: const Color(0xFF08110F),
+                    minimumSize: const Size.fromHeight(60),
+                  ),
+                  onPressed: _isSubmitting ? null : _createProduct,
+                  child: Text(
+                    _isSubmitting
+                        ? strings.t('savingPurchase')
+                        : strings.t('savePurchase'),
+                  ),
+                ),
+              ],
+            ),
+            crossFadeState: _isPurchaseFormExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 180),
           ),
-        ),
+        ],
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.store,
+      builder: (context, _) {
+        final shop = _shop;
+        final strings = AppStrings.of(context);
+
+        if (shop == null) {
+          return Scaffold(
+            appBar: AppBar(title: Text(strings.t('shopsHeroTitle'))),
+            body: AppBackground(
+              child: Center(child: Text(strings.t('shopNotFound'))),
+            ),
+          );
+        }
+
+        final products = widget.store.productsForShop(shop.id);
+        final textTheme = Theme.of(context).textTheme;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(shop.name.isEmpty ? strings.t('newShop') : shop.name),
+          ),
+          body: AppBackground(
+            child: SafeArea(
+              top: false,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+                children: [
+                  _ShopHero(
+                    shop: shop,
+                    onOpenPhoto: shop.photo.isEmpty
+                        ? null
+                        : () => _openImagePreview(
+                            strings.t('shopPhoto'),
+                            shop.photo,
+                          ),
+                    onOpenStorefront: shop.storefrontImages.isEmpty
+                        ? null
+                        : (index) => _openImageGallery(
+                            strings.t('storefrontPhotos'),
+                            shop.storefrontImages,
+                            initialIndex: index,
+                          ),
+                    onOpenCard: shop.businessCardImage.isEmpty
+                        ? null
+                        : () => _openImagePreview(
+                            strings.t('businessCardShort'),
+                            shop.businessCardImage,
+                          ),
+                  ),
+                  const SizedBox(height: 18),
+                  _buildPurchaseComposer(context, strings, textTheme),
+                  const SizedBox(height: 18),
+                  Text(
+                    strings.t('shopPurchases'),
+                    style: textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (products.isEmpty)
+                    const _EmptyShopProducts()
+                  else
+                    ...products.map(
+                      (product) => Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _ShopProductCard(
+                          product: product,
+                          onEdit: () => _openEditor(product),
+                          onDelete: () => _deleteProduct(product),
+                          onToggleFavorite: () => _toggleFavorite(product),
+                          onOpenImage: (index) => _openViewer(product, index),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -839,13 +905,18 @@ class _ShopProductCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final strings = AppStrings.of(context);
     final language = strings.language;
+    final isFavorite = product.isFavorite;
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: isFavorite
+            ? AppColors.primary.withValues(alpha: 0.08)
+            : AppColors.surface,
         borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(
+          color: isFavorite ? AppColors.primary : AppColors.border,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -862,10 +933,14 @@ class _ShopProductCard extends StatelessWidget {
               IconButton.filledTonal(
                 onPressed: onToggleFavorite,
                 style: IconButton.styleFrom(
-                  backgroundColor: AppColors.surfaceStrong,
-                  foregroundColor: AppColors.primary,
+                  backgroundColor: isFavorite
+                      ? AppColors.primary.withValues(alpha: 0.2)
+                      : AppColors.surfaceStrong,
+                  foregroundColor: isFavorite
+                      ? AppColors.primary
+                      : AppColors.textMuted,
                 ),
-                icon: const Icon(Icons.favorite),
+                icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
               ),
             ],
           ),

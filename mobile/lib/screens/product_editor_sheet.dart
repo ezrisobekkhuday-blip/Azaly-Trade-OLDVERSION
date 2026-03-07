@@ -295,6 +295,7 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
                       items: localizedPopularColorSuggestions(language),
                     ),
                   ],
+                  allowMultiSelect: true,
                 ),
                 const SizedBox(height: 14),
                 SuggestionField(

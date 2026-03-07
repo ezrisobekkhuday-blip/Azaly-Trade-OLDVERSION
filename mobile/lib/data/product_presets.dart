@@ -226,7 +226,17 @@ String localizeMaterialValue(AppLanguage language, String value) {
 }
 
 String localizeColorValue(AppLanguage language, String value) {
-  return _localizeSingleValue(value, _colorDictionary, language);
+  if (value.trim().isEmpty) {
+    return value;
+  }
+
+  return value
+      .split(',')
+      .map(
+        (token) =>
+            _localizeSingleValue(token.trim(), _colorDictionary, language),
+      )
+      .join(', ');
 }
 
 String localizeSizeValue(AppLanguage language, String value) {

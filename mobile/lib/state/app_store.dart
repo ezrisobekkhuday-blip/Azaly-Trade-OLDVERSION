@@ -38,9 +38,29 @@ class AppStore extends ChangeNotifier {
 
   List<Product> productsForShop(String shopId) {
     return List.unmodifiable(
-      _products.where(
-        (product) => product.shopId == shopId && !product.isFavorite,
-      ),
+      _products.where((product) => product.shopId == shopId),
+    );
+  }
+
+  ShopPurchaseSummary purchaseSummaryForShop(String shopId) {
+    var totalQuantity = 0;
+    var grossTotal = 0.0;
+    var netTotal = 0.0;
+
+    for (final product in _products) {
+      if (product.shopId != shopId) {
+        continue;
+      }
+
+      totalQuantity += product.quantity;
+      grossTotal += product.grossTotalValue ?? 0;
+      netTotal += product.totalValue ?? 0;
+    }
+
+    return ShopPurchaseSummary(
+      totalQuantity: totalQuantity,
+      grossTotal: grossTotal,
+      netTotal: netTotal,
     );
   }
 
@@ -288,4 +308,16 @@ class AppStore extends ChangeNotifier {
     _apiClient.dispose();
     super.dispose();
   }
+}
+
+class ShopPurchaseSummary {
+  const ShopPurchaseSummary({
+    required this.totalQuantity,
+    required this.grossTotal,
+    required this.netTotal,
+  });
+
+  final int totalQuantity;
+  final double grossTotal;
+  final double netTotal;
 }

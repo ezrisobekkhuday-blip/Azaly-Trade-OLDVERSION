@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../localization/app_strings.dart';
+import '../models/product.dart';
 import '../models/shop.dart';
 import '../services/api_client.dart';
 import '../state/app_store.dart';
@@ -145,6 +146,7 @@ class ShopsScreen extends StatelessWidget {
                 (shop) => Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: _ShopCard(
+                    store: store,
                     shop: shop,
                     onOpen: () => _openShop(context, shop),
                     onEdit: () => _openEditor(context, shop),
@@ -161,12 +163,14 @@ class ShopsScreen extends StatelessWidget {
 
 class _ShopCard extends StatelessWidget {
   const _ShopCard({
+    required this.store,
     required this.shop,
     required this.onOpen,
     required this.onEdit,
     required this.onDelete,
   });
 
+  final AppStore store;
   final Shop shop;
   final VoidCallback onOpen;
   final VoidCallback onEdit;
@@ -176,77 +180,159 @@ class _ShopCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final strings = AppStrings.of(context);
+    final summary = store.purchaseSummaryForShop(shop.id);
+    final title = shop.name.isEmpty ? strings.t('newShop') : shop.name;
+    final hasBusinessCard = shop.businessCardImage.isNotEmpty;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppColors.border),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF10182C), Color(0xFF0D1526)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000000),
+            blurRadius: 18,
+            offset: Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(24),
-            child: shop.photo.isEmpty
-                ? Container(
-                    height: 180,
-                    color: AppColors.surfaceStrong,
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.storefront_outlined,
-                      color: AppColors.textMuted,
-                      size: 36,
+            child: Stack(
+              children: [
+                AspectRatio(
+                  aspectRatio: 1.34,
+                  child: shop.photo.isEmpty
+                      ? Container(
+                          color: AppColors.surfaceStrong,
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.storefront_outlined,
+                            color: AppColors.textMuted,
+                            size: 42,
+                          ),
+                        )
+                      : ProductImage(
+                          source: shop.photo,
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.transparent,
+                          AppColors.background.withValues(alpha: 0.10),
+                          AppColors.background.withValues(alpha: 0.72),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: const [0.0, 0.52, 1.0],
+                      ),
                     ),
-                  )
-                : ProductImage(
-                    source: shop.photo,
-                    width: double.infinity,
-                    height: 180,
-                    fit: BoxFit.cover,
                   ),
+                ),
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (hasBusinessCard)
+                        _OverlayChip(
+                          icon: Icons.badge_outlined,
+                          label: strings.t('businessCardShort'),
+                        ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 12,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _OverlayChip(
+                        icon: Icons.inventory_2_outlined,
+                        label: strings.formatShopItemCount(shop.productsCount),
+                      ),
+                      _OverlayChip(
+                        icon: Icons.layers_outlined,
+                        label:
+                            '${summary.totalQuantity} ${strings.t('piecesShort')}',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Text(
-            shop.name.isEmpty ? strings.t('newShop') : shop.name,
-            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            title,
+            style: textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
+            ),
           ),
           if (shop.location.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               shop.location,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: textTheme.bodyLarge?.copyWith(
                 color: AppColors.textSecondary,
+                height: 1.35,
               ),
             ),
           ],
           if (shop.description.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
               shop.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: textTheme.bodyMedium?.copyWith(
                 color: AppColors.textMuted,
-                height: 1.5,
+                height: 1.4,
               ),
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Row(
             children: [
-              _StatPill(
-                icon: Icons.inventory_2_outlined,
-                label: strings.formatShopItemCount(shop.productsCount),
+              Expanded(
+                child: _ShopSummaryTile(
+                  label: strings.t('grossTotalWithRateLabel'),
+                  value: _formatSummaryMoney(summary.grossTotal),
+                ),
               ),
               const SizedBox(width: 10),
-              if (shop.businessCardImage.isNotEmpty)
-                _StatPill(
-                  icon: Icons.badge_outlined,
-                  label: strings.t('businessCardShort'),
+              Expanded(
+                child: _ShopSummaryTile(
+                  label: strings.t('netTotalWithRateLabel'),
+                  value: _formatSummaryMoney(summary.netTotal),
+                  highlighted: true,
                 ),
+              ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
@@ -254,6 +340,11 @@ class _ShopCard extends StatelessWidget {
                   onPressed: onEdit,
                   icon: const Icon(Icons.edit_outlined),
                   label: Text(strings.t('edit')),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(46),
+                    backgroundColor: const Color(0x2D74A57D),
+                    foregroundColor: AppColors.textPrimary,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -262,6 +353,7 @@ class _ShopCard extends StatelessWidget {
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.danger.withValues(alpha: 0.14),
                     foregroundColor: AppColors.danger,
+                    minimumSize: const Size.fromHeight(46),
                   ),
                   onPressed: onDelete,
                   icon: const Icon(Icons.delete_outline),
@@ -277,7 +369,10 @@ class _ShopCard extends StatelessWidget {
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: const Color(0xFF08110F),
-                minimumSize: const Size.fromHeight(54),
+                minimumSize: const Size.fromHeight(56),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
               ),
               onPressed: onOpen,
               child: Text(strings.t('openShop')),
@@ -289,8 +384,74 @@ class _ShopCard extends StatelessWidget {
   }
 }
 
-class _StatPill extends StatelessWidget {
-  const _StatPill({required this.icon, required this.label});
+String _formatSummaryMoney(double value) {
+  if (value <= 0) {
+    return '0';
+  }
+
+  return formatProductMoney(value);
+}
+
+class _ShopSummaryTile extends StatelessWidget {
+  const _ShopSummaryTile({
+    required this.label,
+    required this.value,
+    this.highlighted = false,
+  });
+
+  final String label;
+  final String value;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: highlighted
+              ? [
+                  AppColors.primary.withValues(alpha: 0.14),
+                  AppColors.surfaceStrong,
+                ]
+              : [AppColors.surfaceStrong, AppColors.surfaceMuted],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: highlighted
+              ? AppColors.primary.withValues(alpha: 0.35)
+              : AppColors.border,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: highlighted ? AppColors.primary : AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OverlayChip extends StatelessWidget {
+  const _OverlayChip({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
@@ -298,18 +459,23 @@ class _StatPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.surfaceStrong,
+        color: const Color(0xA611182B),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: AppColors.textMuted),
-          const SizedBox(width: 8),
-          Text(label),
+          Icon(icon, size: 15, color: AppColors.textSecondary),
+          const SizedBox(width: 7),
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
         ],
       ),
     );

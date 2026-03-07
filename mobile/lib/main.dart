@@ -86,7 +86,6 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _selectedIndex = 0;
   late final List<Widget Function()> _screenBuilders;
-  final List<Widget?> _cachedScreens = List<Widget?>.filled(3, null);
   final Set<int> _activatedIndexes = {0};
 
   @override
@@ -107,10 +106,6 @@ class _HomeShellState extends State<HomeShell> {
       _selectedIndex = index;
       _activatedIndexes.add(index);
     });
-  }
-
-  Widget _screenAt(int index) {
-    return _cachedScreens[index] ??= _screenBuilders[index]();
   }
 
   Future<void> _openSettings() async {
@@ -185,7 +180,7 @@ class _HomeShellState extends State<HomeShell> {
               children: List<Widget>.generate(
                 _screenBuilders.length,
                 (index) => _activatedIndexes.contains(index)
-                    ? _screenAt(index)
+                    ? _screenBuilders[index]()
                     : const SizedBox.shrink(),
                 growable: false,
               ),
