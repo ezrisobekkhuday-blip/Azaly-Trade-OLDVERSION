@@ -73,6 +73,9 @@ def ensure_shop_columns() -> None:
         if "longitude" not in columns:
             connection.execute(text("ALTER TABLE shops ADD COLUMN longitude FLOAT"))
 
+        if "storefront_image" not in columns:
+            connection.execute(text("ALTER TABLE shops ADD COLUMN storefront_image VARCHAR(255) DEFAULT '' NOT NULL"))
+
 
 def ensure_existing_products_have_shop(db: Session) -> None:
     unassigned_products = list(db.scalars(select(Product).where(Product.shop_id.is_(None))).all())
@@ -131,6 +134,9 @@ def serialize_shop(request: Request, shop: Shop, products_count: int = 0) -> Sho
         latitude=shop.latitude,
         longitude=shop.longitude,
         description=shop.description,
+        storefront_image=to_public_image_url(request, shop.storefront_image)
+        if shop.storefront_image
+        else "",
         business_card_image=to_public_image_url(request, shop.business_card_image)
         if shop.business_card_image
         else "",
@@ -295,6 +301,9 @@ def create_shop(
         latitude=payload.latitude,
         longitude=payload.longitude,
         description=payload.description.strip(),
+        storefront_image=normalize_image_path(payload.storefront_image.strip())
+        if payload.storefront_image.strip()
+        else "",
         business_card_image=normalize_image_path(payload.business_card_image.strip())
         if payload.business_card_image.strip()
         else "",
@@ -321,10 +330,18 @@ def update_shop(
         if payload.business_card_image.strip()
         else ""
     )
+    new_storefront = (
+        normalize_image_path(payload.storefront_image.strip())
+        if payload.storefront_image.strip()
+        else ""
+    )
     removed_images: list[str] = []
 
     if shop.photo and shop.photo != new_photo:
         removed_images.append(shop.photo)
+
+    if shop.storefront_image and shop.storefront_image != new_storefront:
+        removed_images.append(shop.storefront_image)
 
     if shop.business_card_image and shop.business_card_image != new_business_card:
         removed_images.append(shop.business_card_image)
@@ -335,6 +352,7 @@ def update_shop(
     shop.latitude = payload.latitude
     shop.longitude = payload.longitude
     shop.description = payload.description.strip()
+    shop.storefront_image = new_storefront
     shop.business_card_image = new_business_card
 
     db.commit()
@@ -359,6 +377,9 @@ def delete_shop(shop_id: int, db: Session = Depends(get_db)) -> None:
 
     if shop.business_card_image:
         images_to_delete.append(shop.business_card_image)
+
+    if shop.storefront_image:
+        images_to_delete.append(shop.storefront_image)
 
     for product in products:
         images_to_delete.extend(product.images)

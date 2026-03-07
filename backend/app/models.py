@@ -23,6 +23,7 @@ class Shop(Base):
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     description: Mapped[str] = mapped_column(Text, default="")
+    storefront_image: Mapped[str] = mapped_column(String(255), default="")
     business_card_image: Mapped[str] = mapped_column(String(255), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

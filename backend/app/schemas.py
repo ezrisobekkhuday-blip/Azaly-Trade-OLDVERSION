@@ -24,6 +24,7 @@ class ShopCreate(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     description: str = ""
+    storefront_image: str = ""
     business_card_image: str = ""
 
 
@@ -34,6 +35,7 @@ class ShopUpdate(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     description: str = ""
+    storefront_image: str = ""
     business_card_image: str = ""
 
 
@@ -45,6 +47,7 @@ class ShopRead(BaseModel):
     latitude: float | None
     longitude: float | None
     description: str
+    storefront_image: str
     business_card_image: str
     products_count: int
     created_at: datetime
