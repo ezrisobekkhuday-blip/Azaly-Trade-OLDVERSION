@@ -29,14 +29,12 @@ class Product {
 
   double? get amountValue => parseProductAmount(amount);
 
+  double? get grossTotalValue => calculateGrossTotal(amount, quantity);
+
+  double? get supplierShareValue => calculateSupplierShare(amount, quantity);
+
   double? get totalValue {
-    final parsedAmount = amountValue;
-
-    if (parsedAmount == null) {
-      return null;
-    }
-
-    return parsedAmount * quantity;
+    return calculateNetTotal(amount, quantity);
   }
 
   Product copyWith({
@@ -113,6 +111,38 @@ double? parseProductAmount(String value) {
   }
 
   return double.tryParse(normalized);
+}
+
+const double supplierShareRate = 0.10;
+
+double? calculateGrossTotal(String amount, int quantity) {
+  final parsedAmount = parseProductAmount(amount);
+
+  if (parsedAmount == null) {
+    return null;
+  }
+
+  return parsedAmount * quantity;
+}
+
+double? calculateSupplierShare(String amount, int quantity) {
+  final grossTotal = calculateGrossTotal(amount, quantity);
+
+  if (grossTotal == null) {
+    return null;
+  }
+
+  return grossTotal * supplierShareRate;
+}
+
+double? calculateNetTotal(String amount, int quantity) {
+  final grossTotal = calculateGrossTotal(amount, quantity);
+
+  if (grossTotal == null) {
+    return null;
+  }
+
+  return grossTotal - (grossTotal * supplierShareRate);
 }
 
 String formatProductMoney(double value) {

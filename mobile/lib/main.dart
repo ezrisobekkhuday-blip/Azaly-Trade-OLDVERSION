@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'localization/app_strings.dart';
 import 'screens/create_shop_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/shops_screen.dart';
@@ -23,32 +25,51 @@ class AzalyTradeApp extends StatefulWidget {
 
 class _AzalyTradeAppState extends State<AzalyTradeApp> {
   late final AppStore _store;
+  AppLanguage _language = AppLanguage.ru;
 
   @override
   void initState() {
     super.initState();
     _store = AppStore();
+    _store.addListener(_syncLanguage);
+    _language = _store.language;
     _store.load();
+  }
+
+  void _syncLanguage() {
+    if (_language == _store.language || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _language = _store.language;
+    });
   }
 
   @override
   void dispose() {
+    _store.removeListener(_syncLanguage);
     _store.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _store,
-      builder: (context, _) {
-        return MaterialApp(
-          debugShowCheckedModeBanner: false,
-          title: 'Azaly Trade',
-          theme: buildAppTheme(),
-          home: HomeShell(store: _store),
-        );
-      },
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Azaly Trade',
+      theme: buildAppTheme(),
+      locale: _language.locale,
+      supportedLocales: AppLanguage.values.map((item) => item.locale).toList(),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      home: AnimatedBuilder(
+        animation: _store,
+        builder: (context, _) => HomeShell(store: _store),
+      ),
     );
   }
 }
@@ -64,30 +85,73 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _selectedIndex = 0;
+  late final List<Widget Function()> _screenBuilders;
+  final List<Widget?> _cachedScreens = List<Widget?>.filled(3, null);
+  final Set<int> _activatedIndexes = {0};
+
+  @override
+  void initState() {
+    super.initState();
+    _screenBuilders = [
+      () => CreateShopScreen(
+        store: widget.store,
+        onOpenShops: () => _selectTab(1),
+      ),
+      () => ShopsScreen(store: widget.store),
+      () => FavoritesScreen(store: widget.store),
+    ];
+  }
+
+  void _selectTab(int index) {
+    setState(() {
+      _selectedIndex = index;
+      _activatedIndexes.add(index);
+    });
+  }
+
+  Widget _screenAt(int index) {
+    return _cachedScreens[index] ??= _screenBuilders[index]();
+  }
 
   Future<void> _openSettings() async {
-    final updatedName = await showModalBottomSheet<String>(
+    final result = await showModalBottomSheet<SettingsSheetResult>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => SettingsSheet(initialName: widget.store.displayName),
+      builder: (_) => SettingsSheet(
+        initialName: widget.store.displayName,
+        initialLanguage: widget.store.language,
+      ),
     );
 
-    if (updatedName == null || !mounted) {
+    if (result == null || !mounted) {
+      return;
+    }
+
+    if (result.language != widget.store.language) {
+      await widget.store.updateLanguage(result.language);
+    }
+
+    final normalizedName = result.displayName.trim().isEmpty
+        ? 'Azaly Trade'
+        : result.displayName.trim();
+
+    if (normalizedName == widget.store.displayName) {
       return;
     }
 
     try {
-      await widget.store.updateName(updatedName);
+      await widget.store.updateName(normalizedName);
     } catch (error) {
       if (mounted) {
+        final strings = AppStrings.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               describeError(
                 error,
-                fallbackMessage: 'Не удалось сохранить имя на сервере.',
+                fallbackMessage: strings.t('saveNameFailed'),
               ),
             ),
           ),
@@ -98,14 +162,7 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    final screens = [
-      CreateShopScreen(
-        store: widget.store,
-        onOpenShops: () => setState(() => _selectedIndex = 1),
-      ),
-      ShopsScreen(store: widget.store),
-      FavoritesScreen(store: widget.store),
-    ];
+    final strings = AppStrings.of(context);
 
     return Scaffold(
       extendBody: true,
@@ -123,7 +180,16 @@ class _HomeShellState extends State<HomeShell> {
         ],
       ),
       body: widget.store.isReady
-          ? IndexedStack(index: _selectedIndex, children: screens)
+          ? IndexedStack(
+              index: _selectedIndex,
+              children: List<Widget>.generate(
+                _screenBuilders.length,
+                (index) => _activatedIndexes.contains(index)
+                    ? _screenAt(index)
+                    : const SizedBox.shrink(),
+                growable: false,
+              ),
+            )
           : const AppBackground(
               child: Center(child: CircularProgressIndicator()),
             ),
@@ -133,23 +199,22 @@ class _HomeShellState extends State<HomeShell> {
           borderRadius: BorderRadius.circular(28),
           child: NavigationBar(
             selectedIndex: _selectedIndex,
-            onDestinationSelected: (value) =>
-                setState(() => _selectedIndex = value),
-            destinations: const [
+            onDestinationSelected: _selectTab,
+            destinations: [
               NavigationDestination(
-                icon: Icon(Icons.add_business_outlined),
-                selectedIcon: Icon(Icons.add_business),
-                label: 'Создать',
+                icon: const Icon(Icons.add_business_outlined),
+                selectedIcon: const Icon(Icons.add_business),
+                label: strings.t('createTab'),
               ),
               NavigationDestination(
-                icon: Icon(Icons.storefront_outlined),
-                selectedIcon: Icon(Icons.storefront),
-                label: 'Магазины',
+                icon: const Icon(Icons.storefront_outlined),
+                selectedIcon: const Icon(Icons.storefront),
+                label: strings.t('shopsTab'),
               ),
               NavigationDestination(
-                icon: Icon(Icons.favorite_border),
-                selectedIcon: Icon(Icons.favorite),
-                label: 'Избранные',
+                icon: const Icon(Icons.favorite_border),
+                selectedIcon: const Icon(Icons.favorite),
+                label: strings.t('favoritesTab'),
               ),
             ],
           ),

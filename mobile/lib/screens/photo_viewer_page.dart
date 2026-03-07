@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../localization/app_strings.dart';
 import '../models/product.dart';
 import '../theme/app_theme.dart';
 import '../widgets/product_image.dart';
@@ -46,6 +47,7 @@ class _PhotoViewerPageState extends State<PhotoViewerPage> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -57,7 +59,7 @@ class _PhotoViewerPageState extends State<PhotoViewerPage> {
               child: Row(
                 children: [
                   Text(
-                    'Фото товара',
+                    strings.t('productPhotoTitle'),
                     style: textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),

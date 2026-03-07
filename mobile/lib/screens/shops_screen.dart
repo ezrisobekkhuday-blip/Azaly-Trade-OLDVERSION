@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../localization/app_strings.dart';
 import '../models/shop.dart';
 import '../services/api_client.dart';
 import '../state/app_store.dart';
@@ -39,18 +40,19 @@ class ShopsScreen extends StatelessWidget {
     try {
       await store.updateShop(updatedShop);
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Магазин обновлён.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.of(context).t('shopUpdated'))),
+        );
       }
     } catch (error) {
       if (context.mounted) {
+        final strings = AppStrings.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               describeError(
                 error,
-                fallbackMessage: 'Не удалось обновить магазин.',
+                fallbackMessage: strings.t('cannotUpdateShop'),
               ),
             ),
           ),
@@ -60,17 +62,16 @@ class ShopsScreen extends StatelessWidget {
   }
 
   Future<void> _deleteShop(BuildContext context, Shop shop) async {
+    final strings = AppStrings.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Удалить магазин?'),
-        content: const Text(
-          'Магазин, товары и фото будут удалены без возможности восстановления.',
-        ),
+        title: Text(strings.t('deleteShopTitle')),
+        content: Text(strings.t('deleteShopMessage')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Отмена'),
+            child: Text(strings.t('cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -78,7 +79,7 @@ class ShopsScreen extends StatelessWidget {
               foregroundColor: AppColors.textPrimary,
             ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Удалить'),
+            child: Text(strings.t('delete')),
           ),
         ],
       ),
@@ -93,7 +94,7 @@ class ShopsScreen extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Магазин удалён.')));
+        ).showSnackBar(SnackBar(content: Text(strings.t('shopDeleted'))));
       }
     } catch (error) {
       if (context.mounted) {
@@ -102,7 +103,7 @@ class ShopsScreen extends StatelessWidget {
             content: Text(
               describeError(
                 error,
-                fallbackMessage: 'Не удалось удалить магазин.',
+                fallbackMessage: strings.t('cannotDeleteShop'),
               ),
             ),
           ),
@@ -114,6 +115,7 @@ class ShopsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shops = store.shops;
+    final strings = AppStrings.of(context);
 
     return AppBackground(
       child: SafeArea(
@@ -122,23 +124,21 @@ class ShopsScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
           children: [
             SectionHeroCard(
-              badge: 'SHOPS',
+              badge: strings.t('shopsHeroBadge'),
               badgeColor: AppColors.primary,
-              title: 'Магазины',
-              description:
-                  'Здесь собраны все магазины. Открой нужный магазин и уже внутри создавай товары.',
+              title: strings.t('shopsHeroTitle'),
+              description: strings.t('shopsHeroDescription'),
               count: shops.length,
-              countLabel: 'Всего магазинов',
+              countLabel: strings.t('totalShops'),
               colors: const [Color(0x2E7C92FF), Color(0x1461E5BE)],
             ),
             const SizedBox(height: 18),
             if (shops.isEmpty)
-              const EmptyStateCard(
+              EmptyStateCard(
                 icon: Icons.storefront_outlined,
                 iconColor: AppColors.accent,
-                title: 'Пока нет магазинов',
-                description:
-                    'Создай магазин в первой вкладке, и он сразу появится здесь.',
+                title: strings.t('noShopsTitle'),
+                description: strings.t('noShopsDescription'),
               )
             else
               ...shops.map(
@@ -175,6 +175,7 @@ class _ShopCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -208,7 +209,7 @@ class _ShopCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            shop.name.isEmpty ? 'Новый магазин' : shop.name,
+            shop.name.isEmpty ? strings.t('newShop') : shop.name,
             style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
           if (shop.location.isNotEmpty) ...[
@@ -235,11 +236,14 @@ class _ShopCard extends StatelessWidget {
             children: [
               _StatPill(
                 icon: Icons.inventory_2_outlined,
-                label: '${shop.productsCount} товаров',
+                label: strings.formatShopItemCount(shop.productsCount),
               ),
               const SizedBox(width: 10),
               if (shop.businessCardImage.isNotEmpty)
-                const _StatPill(icon: Icons.badge_outlined, label: 'Визитка'),
+                _StatPill(
+                  icon: Icons.badge_outlined,
+                  label: strings.t('businessCardShort'),
+                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -249,7 +253,7 @@ class _ShopCard extends StatelessWidget {
                 child: FilledButton.tonalIcon(
                   onPressed: onEdit,
                   icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Редактировать'),
+                  label: Text(strings.t('edit')),
                 ),
               ),
               const SizedBox(width: 12),
@@ -261,7 +265,7 @@ class _ShopCard extends StatelessWidget {
                   ),
                   onPressed: onDelete,
                   icon: const Icon(Icons.delete_outline),
-                  label: const Text('Удалить'),
+                  label: Text(strings.t('delete')),
                 ),
               ),
             ],
@@ -276,7 +280,7 @@ class _ShopCard extends StatelessWidget {
                 minimumSize: const Size.fromHeight(54),
               ),
               onPressed: onOpen,
-              child: const Text('Открыть магазин'),
+              child: Text(strings.t('openShop')),
             ),
           ),
         ],

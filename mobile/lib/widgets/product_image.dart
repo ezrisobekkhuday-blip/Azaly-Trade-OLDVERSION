@@ -20,33 +20,54 @@ class ProductImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cacheWidth = width != null && width!.isFinite ? width!.round() : null;
-    final cacheHeight = height != null && height!.isFinite
-        ? height!.round()
-        : null;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final devicePixelRatio = MediaQuery.devicePixelRatioOf(
+          context,
+        ).clamp(1.0, 2.0);
+        final targetWidth = width != null && width!.isFinite
+            ? width
+            : constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : null;
+        final targetHeight = height != null && height!.isFinite
+            ? height
+            : constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : null;
+        final cacheWidth = targetWidth != null
+            ? (targetWidth * devicePixelRatio).round()
+            : null;
+        final cacheHeight = targetHeight != null
+            ? (targetHeight * devicePixelRatio).round()
+            : null;
 
-    if (isRemoteImageSource(source)) {
-      return Image.network(
-        source,
-        width: width,
-        height: height,
-        fit: fit,
-        cacheWidth: cacheWidth,
-        cacheHeight: cacheHeight,
-        filterQuality: FilterQuality.low,
-        errorBuilder: (_, _, _) => _ImageFallback(width: width, height: height),
-      );
-    }
+        if (isRemoteImageSource(source)) {
+          return Image.network(
+            source,
+            width: width,
+            height: height,
+            fit: fit,
+            cacheWidth: cacheWidth,
+            cacheHeight: cacheHeight,
+            filterQuality: FilterQuality.low,
+            errorBuilder: (_, _, _) =>
+                _ImageFallback(width: width, height: height),
+          );
+        }
 
-    return Image.file(
-      File(source),
-      width: width,
-      height: height,
-      fit: fit,
-      cacheWidth: cacheWidth,
-      cacheHeight: cacheHeight,
-      filterQuality: FilterQuality.low,
-      errorBuilder: (_, _, _) => _ImageFallback(width: width, height: height),
+        return Image.file(
+          File(source),
+          width: width,
+          height: height,
+          fit: fit,
+          cacheWidth: cacheWidth,
+          cacheHeight: cacheHeight,
+          filterQuality: FilterQuality.low,
+          errorBuilder: (_, _, _) =>
+              _ImageFallback(width: width, height: height),
+        );
+      },
     );
   }
 }

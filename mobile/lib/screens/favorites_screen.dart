@@ -3,12 +3,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../data/product_presets.dart';
+import '../localization/app_strings.dart';
 import '../models/product.dart';
 import '../services/api_client.dart';
 import '../state/app_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/product_image.dart';
+import '../widgets/product_thumbnail_card.dart';
 import '../widgets/section_cards.dart';
 import 'photo_viewer_page.dart';
 
@@ -23,17 +26,18 @@ class FavoritesScreen extends StatelessWidget {
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Товар убран из избранного.')),
+          SnackBar(content: Text(AppStrings.of(context).t('favoriteRemoved'))),
         );
       }
     } catch (error) {
       if (context.mounted) {
+        final strings = AppStrings.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               describeError(
                 error,
-                fallbackMessage: 'Не удалось обновить избранное.',
+                fallbackMessage: strings.t('cannotUpdateFavorite'),
               ),
             ),
           ),
@@ -57,49 +61,52 @@ class FavoritesScreen extends StatelessWidget {
   }
 
   Future<void> _shareProduct(BuildContext context, Product product) async {
+    final strings = AppStrings.of(context);
+    final language = strings.language;
+    final grossTotal = product.grossTotalValue;
+    final supplierShare = product.supplierShareValue;
     final files = product.imagePaths
         .where((path) => !isRemoteImageSource(path) && File(path).existsSync())
         .map(XFile.new)
         .toList();
     final remoteImages = product.imagePaths.where(isRemoteImageSource).toList();
     final summary = [
-      'Избранный закуп из Azaly Trade',
-      'Цена закупа: ${product.amount.isEmpty ? 'Не указано' : product.amount}',
-      'Количество: ${product.quantity}',
-      'Итог: ${product.totalValue == null ? 'Не указано' : formatProductMoney(product.totalValue!)}',
-      'Цвет: ${product.color.isEmpty ? 'Не указано' : product.color}',
-      'Материал: ${product.material.isEmpty ? 'Не указано' : product.material}',
-      'Размер: ${product.size.isEmpty ? 'Не указано' : product.size}',
-      'Статус: ${product.status}',
-      if (remoteImages.isNotEmpty) ...['Фото:', ...remoteImages],
+      strings.t('shareSummaryTitle'),
+      '${strings.t('purchasePriceLabel')}: ${product.amount.isEmpty ? strings.t('notSpecified') : product.amount}',
+      '${strings.t('quantityLabel')}: ${product.quantity}',
+      '${strings.t('grossTotalLabel')}: ${grossTotal == null ? strings.t('notSpecified') : formatProductMoney(grossTotal)}',
+      '${strings.t('supplierShareLabel')}: ${supplierShare == null ? strings.t('notSpecified') : '-${formatProductMoney(supplierShare)}'}',
+      '${strings.t('totalLabel')}: ${product.totalValue == null ? strings.t('notSpecified') : formatProductMoney(product.totalValue!)}',
+      '${strings.t('colorLabel')}: ${product.color.isEmpty ? strings.t('notSpecified') : localizeColorValue(language, product.color)}',
+      '${strings.t('materialLabel')}: ${product.material.isEmpty ? strings.t('notSpecified') : localizeMaterialValue(language, product.material)}',
+      '${strings.t('sizeLabel')}: ${product.size.isEmpty ? strings.t('notSpecified') : localizeSizeValue(language, product.size)}',
+      '${strings.t('statusLabel')}: ${strings.localizeStatus(product.status)}',
+      if (remoteImages.isNotEmpty) ...[
+        '${strings.t('photosLabel')}:',
+        ...remoteImages,
+      ],
     ].join('\n');
 
     try {
       await SharePlus.instance.share(
         ShareParams(
-          title: 'Azaly Trade',
-          subject: 'Избранный закуп',
+          title: strings.t('shareTitle'),
+          subject: strings.t('shareSubject'),
           text: summary,
           files: files.isEmpty ? null : files,
         ),
       );
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Открылось меню «Поделиться». Можно выбрать Telegram.',
-            ),
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(strings.t('shareMenuOpened'))));
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Не удалось открыть меню «Поделиться».'),
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(strings.t('shareMenuFailed'))));
       }
     }
   }
@@ -107,6 +114,7 @@ class FavoritesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final favorites = store.favoriteProducts;
+    final strings = AppStrings.of(context);
 
     return AppBackground(
       child: SafeArea(
@@ -115,23 +123,21 @@ class FavoritesScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
           children: [
             SectionHeroCard(
-              badge: 'FAVORITES',
+              badge: strings.t('favoritesHeroBadge'),
               badgeColor: AppColors.danger,
-              title: 'Избранные',
-              description:
-                  'Сюда попадают любимые товары. Здесь можно открыть фото и отправить карточку через Telegram или другое приложение.',
+              title: strings.t('favoritesHeroTitle'),
+              description: strings.t('favoritesHeroDescription'),
               count: favorites.length,
-              countLabel: 'Любимых товаров',
+              countLabel: strings.t('favoriteCountLabel'),
               colors: const [Color(0x24FF7D93), Color(0x147C92FF)],
             ),
             const SizedBox(height: 18),
             if (favorites.isEmpty)
-              const EmptyStateCard(
+              EmptyStateCard(
                 icon: Icons.favorite_border,
                 iconColor: AppColors.danger,
-                title: 'Пока нет избранного',
-                description:
-                    'Нажми на сердечко у товара во второй вкладке, и он появится здесь.',
+                title: strings.t('noFavoritesTitle'),
+                description: strings.t('noFavoritesDescription'),
               )
             else
               ...favorites.map(
@@ -169,6 +175,8 @@ class _FavoriteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
+    final language = strings.language;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -192,7 +200,7 @@ class _FavoriteCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  'ИЗБРАННЫЙ',
+                  strings.t('favoriteBadge'),
                   style: textTheme.labelLarge?.copyWith(
                     color: AppColors.danger,
                     fontWeight: FontWeight.w800,
@@ -212,22 +220,14 @@ class _FavoriteCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           SizedBox(
-            height: 110,
+            height: 148,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: product.imagePaths.length,
               separatorBuilder: (_, index) => const SizedBox(width: 12),
-              itemBuilder: (context, index) => InkWell(
+              itemBuilder: (context, index) => ProductThumbnailCard(
+                source: product.imagePaths[index],
                 onTap: () => onOpenImage(index),
-                borderRadius: BorderRadius.circular(24),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: ProductImage(
-                    source: product.imagePaths[index],
-                    width: 110,
-                    height: 110,
-                  ),
-                ),
               ),
             ),
           ),
@@ -237,29 +237,38 @@ class _FavoriteCard extends StatelessWidget {
             runSpacing: 10,
             children: [
               _InfoTile(
-                label: 'Цена',
-                value: product.amount.isEmpty ? 'Не указано' : product.amount,
+                label: strings.t('priceLabel'),
+                value: product.amount.isEmpty
+                    ? strings.t('notSpecified')
+                    : product.amount,
               ),
-              _InfoTile(label: 'Штук', value: '${product.quantity}'),
               _InfoTile(
-                label: 'Итог',
+                label: strings.t('piecesLabel'),
+                value: '${product.quantity}',
+              ),
+              _InfoTile(
+                label: strings.t('totalLabel'),
                 value: product.totalValue == null
-                    ? 'Не указано'
+                    ? strings.t('notSpecified')
                     : formatProductMoney(product.totalValue!),
               ),
               _InfoTile(
-                label: 'Цвет',
-                value: product.color.isEmpty ? 'Не указано' : product.color,
+                label: strings.t('colorLabel'),
+                value: product.color.isEmpty
+                    ? strings.t('notSpecified')
+                    : localizeColorValue(language, product.color),
               ),
               _InfoTile(
-                label: 'Материал',
+                label: strings.t('materialLabel'),
                 value: product.material.isEmpty
-                    ? 'Не указано'
-                    : product.material,
+                    ? strings.t('notSpecified')
+                    : localizeMaterialValue(language, product.material),
               ),
               _InfoTile(
-                label: 'Размер',
-                value: product.size.isEmpty ? 'Не указано' : product.size,
+                label: strings.t('sizeLabel'),
+                value: product.size.isEmpty
+                    ? strings.t('notSpecified')
+                    : localizeSizeValue(language, product.size),
               ),
             ],
           ),
@@ -274,7 +283,7 @@ class _FavoriteCard extends StatelessWidget {
                     foregroundColor: const Color(0xFF08110F),
                   ),
                   icon: const Icon(Icons.share_outlined),
-                  label: const Text('Поделиться'),
+                  label: Text(strings.t('share')),
                 ),
               ),
               const SizedBox(width: 12),
@@ -282,7 +291,7 @@ class _FavoriteCard extends StatelessWidget {
                 child: FilledButton.tonalIcon(
                   onPressed: onUnfavorite,
                   icon: const Icon(Icons.heart_broken_outlined),
-                  label: const Text('Убрать'),
+                  label: Text(strings.t('remove')),
                 ),
               ),
             ],

@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/product_presets.dart';
+import '../localization/app_strings.dart';
 import '../models/product.dart';
 import '../theme/app_theme.dart';
-import '../widgets/product_image.dart';
+import '../widgets/product_thumbnail_card.dart';
 import '../widgets/suggestion_field.dart';
+
+const double _pickedImageMaxDimension = 1440;
+const int _pickedImageQuality = 70;
 
 class ProductEditorSheet extends StatefulWidget {
   const ProductEditorSheet({super.key, required this.product});
@@ -25,6 +30,7 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
   late final TextEditingController _quantityController;
   late final List<String> _imagePaths;
   late int _quantity;
+  bool _didApplyLocalizedValues = false;
 
   @override
   void initState() {
@@ -48,14 +54,26 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
     super.dispose();
   }
 
-  double? get _draftTotal {
-    final amount = parseProductAmount(_amountController.text);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
 
-    if (amount == null) {
-      return null;
+    if (_didApplyLocalizedValues) {
+      return;
     }
 
-    return amount * _quantity;
+    final language = AppStrings.of(context).language;
+    _colorController.text = localizeColorValue(language, _colorController.text);
+    _materialController.text = localizeMaterialValue(
+      language,
+      _materialController.text,
+    );
+    _sizeController.text = localizeSizeValue(language, _sizeController.text);
+    _didApplyLocalizedValues = true;
+  }
+
+  double? get _draftTotal {
+    return calculateNetTotal(_amountController.text, _quantity);
   }
 
   void _setQuantity(int value) {
@@ -82,7 +100,11 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
 
   Future<void> _pickFromGallery() async {
     try {
-      final files = await _picker.pickMultiImage(imageQuality: 74);
+      final files = await _picker.pickMultiImage(
+        imageQuality: _pickedImageQuality,
+        maxWidth: _pickedImageMaxDimension,
+        maxHeight: _pickedImageMaxDimension,
+      );
 
       if (!mounted || files.isEmpty) {
         return;
@@ -92,7 +114,7 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
         _imagePaths.addAll(files.map((file) => file.path));
       });
     } catch (_) {
-      _showMessage('Не удалось открыть галерею.');
+      _showMessage(AppStrings.of(context).t('cannotOpenGallery'));
     }
   }
 
@@ -100,7 +122,9 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
     try {
       final file = await _picker.pickImage(
         source: ImageSource.camera,
-        imageQuality: 74,
+        imageQuality: _pickedImageQuality,
+        maxWidth: _pickedImageMaxDimension,
+        maxHeight: _pickedImageMaxDimension,
       );
 
       if (!mounted || file == null) {
@@ -111,7 +135,7 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
         _imagePaths.add(file.path);
       });
     } catch (_) {
-      _showMessage('Не удалось открыть камеру.');
+      _showMessage(AppStrings.of(context).t('cannotOpenCamera'));
     }
   }
 
@@ -123,7 +147,7 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
 
   void _save() {
     if (_imagePaths.isEmpty) {
-      _showMessage('У закупа должно остаться хотя бы одно фото.');
+      _showMessage(AppStrings.of(context).t('keepAtLeastOnePhoto'));
       return;
     }
 
@@ -143,6 +167,8 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
+    final language = strings.language;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset + 16),
@@ -169,14 +195,14 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Редактировать закуп',
+                            strings.t('editPurchaseTitle'),
                             style: textTheme.headlineSmall?.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Обнови фото, цену закупа, количество и остальные поля.',
+                            strings.t('editPurchaseDescription'),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: textTheme.bodyMedium?.copyWith(
@@ -199,7 +225,7 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
                       child: FilledButton.tonalIcon(
                         onPressed: _pickFromGallery,
                         icon: const Icon(Icons.photo_library_outlined),
-                        label: const Text('Галерея'),
+                        label: Text(strings.t('gallery')),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -207,7 +233,7 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
                       child: FilledButton.tonalIcon(
                         onPressed: _takePhoto,
                         icon: const Icon(Icons.photo_camera_outlined),
-                        label: const Text('Камера'),
+                        label: Text(strings.t('camera')),
                       ),
                     ),
                   ],
@@ -217,7 +243,7 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
                   const _EmptyEditorImages()
                 else
                   SizedBox(
-                    height: 122,
+                    height: 148,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: _imagePaths.length,
@@ -225,32 +251,10 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
                       itemBuilder: (context, index) {
                         final path = _imagePaths[index];
 
-                        return Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(24),
-                              child: ProductImage(
-                                source: path,
-                                width: 122,
-                                height: 122,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            Positioned(
-                              right: 8,
-                              top: 8,
-                              child: IconButton.filledTonal(
-                                style: IconButton.styleFrom(
-                                  backgroundColor: AppColors.background
-                                      .withValues(alpha: 0.82),
-                                  foregroundColor: AppColors.textPrimary,
-                                ),
-                                onPressed: () =>
-                                    setState(() => _imagePaths.removeAt(index)),
-                                icon: const Icon(Icons.close, size: 18),
-                              ),
-                            ),
-                          ],
+                        return ProductThumbnailCard(
+                          source: path,
+                          onRemove: () =>
+                              setState(() => _imagePaths.removeAt(index)),
                         );
                       },
                     ),
@@ -268,9 +272,9 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: const InputDecoration(
-                    labelText: 'Цена закупа',
-                    hintText: 'Например: 120 000',
+                  decoration: InputDecoration(
+                    labelText: strings.t('purchasePriceLabel'),
+                    hintText: strings.t('purchasePriceHint'),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -278,53 +282,51 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
                   controller: _quantityController,
                   quantity: _quantity,
                   onChanged: _syncQuantityFromText,
-                  onDecrease: () => _setQuantity(_quantity - 1),
-                  onIncrease: () => _setQuantity(_quantity + 1),
                 ),
                 const SizedBox(height: 14),
                 SuggestionField(
                   controller: _colorController,
-                  label: 'Цвет',
-                  hint: 'Например: Black, Beige, Blue',
-                  suggestions: colorSuggestions,
-                  quickGroups: const [
+                  label: strings.t('colorLabel'),
+                  hint: strings.t('colorHint'),
+                  suggestions: localizedColorSuggestions(language),
+                  quickGroups: [
                     SuggestionGroup(
-                      label: 'Популярные цвета',
-                      items: popularColorSuggestions,
+                      label: strings.t('popularColors'),
+                      items: localizedPopularColorSuggestions(language),
                     ),
                   ],
                 ),
                 const SizedBox(height: 14),
                 SuggestionField(
                   controller: _materialController,
-                  label: 'Материал',
-                  hint: 'Например: Angora, Cotton, Leather',
-                  suggestions: materialSuggestions,
-                  quickGroups: const [
+                  label: strings.t('materialLabel'),
+                  hint: strings.t('materialHint'),
+                  suggestions: localizedMaterialSuggestions(language),
+                  quickGroups: [
                     SuggestionGroup(
-                      label: 'Популярные',
-                      items: popularMaterialSuggestions,
+                      label: strings.t('popular'),
+                      items: localizedPopularMaterialSuggestions(language),
                     ),
                   ],
                 ),
                 const SizedBox(height: 14),
                 SuggestionField(
                   controller: _sizeController,
-                  label: 'Размер',
-                  hint: 'Например: XL, 58, Standard',
-                  suggestions: sizeSuggestions,
-                  quickGroups: const [
+                  label: strings.t('sizeLabel'),
+                  hint: strings.t('sizeHint'),
+                  suggestions: localizedSizeSuggestions(language),
+                  quickGroups: [
                     SuggestionGroup(
-                      label: 'Буквенные размеры',
+                      label: strings.t('alphaSizes'),
                       items: alphaSizeSuggestions,
                     ),
                     SuggestionGroup(
-                      label: 'Числовые размеры',
+                      label: strings.t('numericSizes'),
                       items: numericSizeSuggestions,
                     ),
                     SuggestionGroup(
-                      label: 'Особые',
-                      items: specialSizeSuggestions,
+                      label: strings.t('specialSizes'),
+                      items: localizedSpecialSizeSuggestions(language),
                     ),
                   ],
                   allowMultiSelect: true,
@@ -339,7 +341,7 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
                       minimumSize: const Size.fromHeight(56),
                     ),
                     onPressed: _save,
-                    child: const Text('Сохранить закуп'),
+                    child: Text(strings.t('savePurchase')),
                   ),
                 ),
               ],
@@ -365,6 +367,9 @@ class _EditorPurchaseSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
+    final grossTotal = calculateGrossTotal(amount, quantity);
+    final supplierShare = calculateSupplierShare(amount, quantity);
 
     return Container(
       width: double.infinity,
@@ -378,20 +383,36 @@ class _EditorPurchaseSummaryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Итог закупа',
+            strings.t('purchaseTotalTitle'),
             style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           Text(
             total == null
-                ? 'Укажи цену и количество'
-                : '${amount.trim().isEmpty ? '0' : amount.trim()} x $quantity = ${formatProductMoney(total!)}',
+                ? strings.t('enterPriceAndQuantity')
+                : '${amount.trim().isEmpty ? '0' : amount.trim()} x $quantity = ${formatProductMoney(grossTotal!)}',
             style: textTheme.bodyLarge?.copyWith(
               color: total == null
                   ? AppColors.textSecondary
                   : AppColors.textPrimary,
             ),
           ),
+          if (total != null && supplierShare != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${strings.t('supplierShareLabel')}: -${formatProductMoney(supplierShare)}',
+              style: textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${strings.t('totalLabel')}: ${formatProductMoney(total!)}',
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -403,19 +424,16 @@ class _EditorQuantityStepper extends StatelessWidget {
     required this.controller,
     required this.quantity,
     required this.onChanged,
-    required this.onDecrease,
-    required this.onIncrease,
   });
 
   final TextEditingController controller;
   final int quantity;
   final ValueChanged<String> onChanged;
-  final VoidCallback onDecrease;
-  final VoidCallback onIncrease;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -428,39 +446,17 @@ class _EditorQuantityStepper extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Количество',
+            strings.t('quantityLabel'),
             style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              IconButton.filledTonal(
-                onPressed: quantity > 1 ? onDecrease : null,
-                icon: const Icon(Icons.remove),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  onChanged: onChanged,
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  decoration: const InputDecoration(
-                    labelText: 'Штук',
-                    hintText: '1',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              IconButton.filled(
-                onPressed: onIncrease,
-                style: IconButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: const Color(0xFF08110F),
-                ),
-                icon: const Icon(Icons.add),
-              ),
-            ],
+          TextField(
+            controller: controller,
+            onChanged: onChanged,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: const InputDecoration(hintText: '1'),
           ),
         ],
       ),
@@ -474,6 +470,7 @@ class _EmptyEditorImages extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
 
     return Container(
       width: double.infinity,
@@ -484,7 +481,7 @@ class _EmptyEditorImages extends StatelessWidget {
         border: Border.all(color: AppColors.border),
       ),
       child: Text(
-        'Добавь хотя бы одно фото, чтобы сохранить закуп.',
+        strings.t('addAtLeastOnePhoto'),
         style: textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary),
       ),
     );

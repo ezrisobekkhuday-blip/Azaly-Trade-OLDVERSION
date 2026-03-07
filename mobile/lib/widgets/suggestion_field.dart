@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../localization/app_strings.dart';
 import '../theme/app_theme.dart';
 
 class SuggestionGroup {
@@ -98,6 +99,8 @@ class SuggestionField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
+
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
@@ -155,7 +158,9 @@ class SuggestionField extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      quickGroups.isEmpty ? 'Подсказки' : 'Другие варианты',
+                      quickGroups.isEmpty
+                          ? strings.t('suggestions')
+                          : strings.t('otherOptions'),
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
                         color: AppColors.textMuted,
                         fontWeight: FontWeight.w700,

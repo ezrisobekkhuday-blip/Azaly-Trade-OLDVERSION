@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../localization/app_strings.dart';
 import '../models/map_selection_result.dart';
 import '../models/shop.dart';
 import '../theme/app_theme.dart';
@@ -85,6 +86,7 @@ class _ShopEditorSheetState extends State<ShopEditorSheet> {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final textTheme = Theme.of(context).textTheme;
     final hasCoordinates = _latitude != null && _longitude != null;
+    final strings = AppStrings.of(context);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset + 16),
@@ -111,14 +113,14 @@ class _ShopEditorSheetState extends State<ShopEditorSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Редактировать магазин',
+                            strings.t('editShopTitle'),
                             style: textTheme.headlineSmall?.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Измени название, локацию или описание.',
+                            strings.t('editShopDescription'),
                             style: textTheme.bodyMedium?.copyWith(
                               color: AppColors.textSecondary,
                             ),
@@ -155,26 +157,26 @@ class _ShopEditorSheetState extends State<ShopEditorSheet> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Название магазина',
-                    hintText: 'Например: Azaly',
+                  decoration: InputDecoration(
+                    labelText: strings.t('shopNameLabel'),
+                    hintText: strings.t('shopNameHint'),
                   ),
                 ),
                 const SizedBox(height: 14),
                 TextField(
                   controller: _locationController,
-                  decoration: const InputDecoration(
-                    labelText: 'Локация магазина',
-                    hintText: 'Адрес или район',
+                  decoration: InputDecoration(
+                    labelText: strings.t('shopLocationLabel'),
+                    hintText: strings.t('locationHintShort'),
                   ),
                 ),
                 const SizedBox(height: 14),
                 TextField(
                   controller: _descriptionController,
                   maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Доп. описание',
-                    hintText: 'Коротко про магазин',
+                  decoration: InputDecoration(
+                    labelText: strings.t('extraDescriptionLabel'),
+                    hintText: strings.t('shortShopDescriptionHint'),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -189,7 +191,7 @@ class _ShopEditorSheetState extends State<ShopEditorSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Точка на карте',
+                        strings.t('pointOnMap'),
                         style: textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
@@ -221,7 +223,7 @@ class _ShopEditorSheetState extends State<ShopEditorSheet> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Точка пока не выбрана',
+                                strings.t('pointNotSelected'),
                                 style: textTheme.bodyMedium?.copyWith(
                                   color: AppColors.textSecondary,
                                 ),
@@ -237,8 +239,8 @@ class _ShopEditorSheetState extends State<ShopEditorSheet> {
                           icon: const Icon(Icons.map_outlined),
                           label: Text(
                             hasCoordinates
-                                ? 'Изменить точку'
-                                : 'Выбрать на карте',
+                                ? strings.t('changePoint')
+                                : strings.t('pickOnMap'),
                           ),
                         ),
                       ),
@@ -255,7 +257,7 @@ class _ShopEditorSheetState extends State<ShopEditorSheet> {
                       minimumSize: const Size.fromHeight(56),
                     ),
                     onPressed: _save,
-                    child: const Text('Сохранить'),
+                    child: Text(strings.t('save')),
                   ),
                 ),
               ],

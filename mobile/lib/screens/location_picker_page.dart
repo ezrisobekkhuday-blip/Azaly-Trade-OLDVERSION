@@ -6,6 +6,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../localization/app_strings.dart';
 import '../models/map_selection_result.dart';
 import '../theme/app_theme.dart';
 
@@ -41,6 +42,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   }
 
   Future<void> _moveToCurrentLocation() async {
+    final strings = AppStrings.of(context);
+
     setState(() {
       _isResolvingCurrent = true;
     });
@@ -48,7 +51,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        _showMessage('Включите геолокацию на устройстве.');
+        _showMessage(strings.t('turnOnLocation'));
         return;
       }
 
@@ -59,7 +62,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        _showMessage('Разрешите доступ к геолокации.');
+        _showMessage(strings.t('allowLocationAccess'));
         return;
       }
 
@@ -77,7 +80,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       }
 
       if (position == null) {
-        _showMessage('Не удалось получить текущую точку.');
+        _showMessage(strings.t('cannotGetCurrentPoint'));
         return;
       }
 
@@ -87,7 +90,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       });
       _mapController.move(point, 16);
     } catch (_) {
-      _showMessage('Не удалось определить текущую точку.');
+      _showMessage(strings.t('cannotDetermineCurrentPoint'));
     } finally {
       if (mounted) {
         setState(() {
@@ -163,9 +166,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Точка магазина')),
+      appBar: AppBar(title: Text(strings.t('mapPointPageTitle'))),
       body: Column(
         children: [
           Expanded(
@@ -212,14 +216,14 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Поставь метку на карту',
+                  strings.t('placePinOnMap'),
                   style: textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Нажми на карту там, где находится магазин.',
+                  strings.t('tapWhereShopIs'),
                   style: textTheme.bodyMedium?.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -259,14 +263,16 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                                 ),
                               )
                             : const Icon(Icons.my_location_outlined),
-                        label: const Text('Моя точка'),
+                        label: Text(strings.t('myPoint')),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: FilledButton(
                         onPressed: _isSaving ? null : _saveSelection,
-                        child: Text(_isSaving ? 'Сохраняем...' : 'Сохранить'),
+                        child: Text(
+                          _isSaving ? strings.t('saving') : strings.t('save'),
+                        ),
                       ),
                     ),
                   ],

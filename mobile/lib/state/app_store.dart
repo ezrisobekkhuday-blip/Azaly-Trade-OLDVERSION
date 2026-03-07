@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../localization/app_strings.dart';
 import '../models/product.dart';
 import '../models/shop.dart';
 import '../services/api_client.dart';
@@ -7,14 +9,18 @@ import '../services/api_client.dart';
 class AppStore extends ChangeNotifier {
   AppStore({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
 
+  static const String _languageStorageKey = 'app_language';
+
   final ApiClient _apiClient;
   bool _isReady = false;
   String _displayName = 'Azaly Trade';
+  AppLanguage _language = AppLanguage.ru;
   final List<Shop> _shops = [];
   final List<Product> _products = [];
 
   bool get isReady => _isReady;
   String get displayName => _displayName;
+  AppLanguage get language => _language;
   List<Shop> get shops => List.unmodifiable(_shops);
   List<Product> get allProducts => List.unmodifiable(_products);
   List<Product> get favoriteProducts =>
@@ -39,6 +45,11 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> load() async {
+    final preferences = await SharedPreferences.getInstance();
+    _language = AppLanguage.fromCode(
+      preferences.getString(_languageStorageKey) ?? AppLanguage.ru.code,
+    );
+
     try {
       final bootstrap = await _apiClient.fetchBootstrap();
       _displayName = bootstrap.displayName;
@@ -65,6 +76,17 @@ class AppStore extends ChangeNotifier {
     );
 
     _displayName = updatedName;
+    notifyListeners();
+  }
+
+  Future<void> updateLanguage(AppLanguage language) async {
+    if (_language == language) {
+      return;
+    }
+
+    _language = language;
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_languageStorageKey, language.code);
     notifyListeners();
   }
 

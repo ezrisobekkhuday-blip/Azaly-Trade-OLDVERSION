@@ -5,6 +5,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../localization/app_strings.dart';
 import '../models/map_selection_result.dart';
 import '../services/api_client.dart';
 import '../state/app_store.dart';
@@ -13,6 +14,9 @@ import '../widgets/app_background.dart';
 import '../widgets/product_image.dart';
 import '../widgets/shop_map_preview.dart';
 import 'location_picker_page.dart';
+
+const double _pickedImageMaxDimension = 1440;
+const int _pickedImageQuality = 70;
 
 class CreateShopScreen extends StatefulWidget {
   const CreateShopScreen({
@@ -52,7 +56,12 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
 
   Future<void> _pickShopPhoto(ImageSource source) async {
     try {
-      final file = await _picker.pickImage(source: source, imageQuality: 74);
+      final file = await _picker.pickImage(
+        source: source,
+        imageQuality: _pickedImageQuality,
+        maxWidth: _pickedImageMaxDimension,
+        maxHeight: _pickedImageMaxDimension,
+      );
 
       if (!mounted || file == null) {
         return;
@@ -62,13 +71,18 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
         _shopPhotoPath = file.path;
       });
     } catch (_) {
-      _showMessage('Не удалось загрузить фото магазина.');
+      _showMessage(AppStrings.of(context).t('cannotLoadShopPhoto'));
     }
   }
 
   Future<void> _pickBusinessCard(ImageSource source) async {
     try {
-      final file = await _picker.pickImage(source: source, imageQuality: 74);
+      final file = await _picker.pickImage(
+        source: source,
+        imageQuality: _pickedImageQuality,
+        maxWidth: _pickedImageMaxDimension,
+        maxHeight: _pickedImageMaxDimension,
+      );
 
       if (!mounted || file == null) {
         return;
@@ -78,13 +92,17 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
         _businessCardPath = file.path;
       });
     } catch (_) {
-      _showMessage('Не удалось загрузить визитку.');
+      _showMessage(AppStrings.of(context).t('cannotLoadBusinessCard'));
     }
   }
 
   Future<void> _pickStorefrontFromGallery() async {
     try {
-      final files = await _picker.pickMultiImage(imageQuality: 74);
+      final files = await _picker.pickMultiImage(
+        imageQuality: _pickedImageQuality,
+        maxWidth: _pickedImageMaxDimension,
+        maxHeight: _pickedImageMaxDimension,
+      );
 
       if (!mounted || files.isEmpty) {
         return;
@@ -94,7 +112,7 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
         _storefrontPhotoPaths.addAll(files.map((file) => file.path));
       });
     } catch (_) {
-      _showMessage('Не удалось загрузить фото витрины.');
+      _showMessage(AppStrings.of(context).t('cannotLoadStorefront'));
     }
   }
 
@@ -102,7 +120,9 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
     try {
       final file = await _picker.pickImage(
         source: ImageSource.camera,
-        imageQuality: 74,
+        imageQuality: _pickedImageQuality,
+        maxWidth: _pickedImageMaxDimension,
+        maxHeight: _pickedImageMaxDimension,
       );
 
       if (!mounted || file == null) {
@@ -113,15 +133,13 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
         _storefrontPhotoPaths.add(file.path);
       });
     } catch (_) {
-      _showMessage(
-        'РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ РєР°РјРµСЂСѓ РґР»СЏ РІРёС‚СЂРёРЅС‹.',
-      );
+      _showMessage(AppStrings.of(context).t('cannotOpenStorefrontCamera'));
     }
   }
 
   Future<void> _createShop() async {
     if (_shopPhotoPath.isEmpty) {
-      _showMessage('Добавьте фото магазина.');
+      _showMessage(AppStrings.of(context).t('addShopPhotoFirst'));
       return;
     }
 
@@ -158,7 +176,7 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
       });
 
       widget.onOpenShops();
-      _showMessage('Магазин создан.');
+      _showMessage(AppStrings.of(context).t('shopCreated'));
     } catch (error) {
       if (!mounted) {
         return;
@@ -167,7 +185,7 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
       _showMessage(
         describeError(
           error,
-          fallbackMessage: 'Не удалось сохранить магазин на сервере.',
+          fallbackMessage: AppStrings.of(context).t('cannotSaveShop'),
         ),
       );
     } finally {
@@ -226,6 +244,8 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
   }
 
   Future<void> _fillCurrentLocation() async {
+    final strings = AppStrings.of(context);
+
     setState(() {
       _isResolvingLocation = true;
     });
@@ -233,7 +253,7 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        _showMessage('Включите геолокацию на устройстве.');
+        _showMessage(strings.t('turnOnLocation'));
         return;
       }
 
@@ -244,7 +264,7 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
 
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        _showMessage('Разрешите доступ к геолокации.');
+        _showMessage(strings.t('allowLocationAccess'));
         return;
       }
 
@@ -262,7 +282,7 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
       }
 
       if (position == null) {
-        _showMessage('Не удалось быстро получить геолокацию.');
+        _showMessage(strings.t('cannotGetQuickLocation'));
         return;
       }
 
@@ -301,7 +321,7 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
         // Leave coordinates in the field if reverse geocoding is slow.
       }
     } catch (_) {
-      _showMessage('Не удалось определить локацию.');
+      _showMessage(strings.t('cannotDetermineLocation'));
     } finally {
       if (mounted && _isResolvingLocation) {
         setState(() {
@@ -338,6 +358,7 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
 
     return AppBackground(
       child: SafeArea(
@@ -355,14 +376,14 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Создать магазин',
+                    strings.t('createShopTitle'),
                     style: textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Добавь фото и создай магазин. Остальное можно позже.',
+                    strings.t('createShopDescription'),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: textTheme.bodyMedium?.copyWith(
@@ -371,7 +392,7 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
                   ),
                   const SizedBox(height: 16),
                   _ImagePickerCard(
-                    title: 'Фото магазина',
+                    title: strings.t('shopPhoto'),
                     imagePath: _shopPhotoPath,
                     onGallery: _isSubmitting
                         ? null
@@ -385,9 +406,8 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
                   ),
                   const SizedBox(height: 14),
                   _ImagePickerCard(
-                    title: 'Фото витрины',
-                    helperText:
-                        'Сфотографируйте вход, вывеску или витрину магазина.',
+                    title: strings.t('storefrontPhotos'),
+                    helperText: strings.t('storefrontHelper'),
                     imagePaths: _storefrontPhotoPaths,
                     onGallery: _isSubmitting
                         ? null
@@ -405,17 +425,17 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
                   const SizedBox(height: 14),
                   TextField(
                     controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Название магазина',
-                      hintText: 'Можно оставить пустым',
+                    decoration: InputDecoration(
+                      labelText: strings.t('shopNameLabel'),
+                      hintText: strings.t('shopNameOptionalHint'),
                     ),
                   ),
                   const SizedBox(height: 14),
                   TextField(
                     controller: _locationController,
                     decoration: InputDecoration(
-                      labelText: 'Локация магазина',
-                      hintText: 'Ввести вручную или определить',
+                      labelText: strings.t('shopLocationLabel'),
+                      hintText: strings.t('shopLocationHint'),
                       suffixIcon: _isResolvingLocation
                           ? const Padding(
                               padding: EdgeInsets.all(14),
@@ -431,7 +451,7 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
                               onPressed: _isSubmitting
                                   ? null
                                   : _fillCurrentLocation,
-                              tooltip: 'Определить локацию',
+                              tooltip: strings.t('detectLocation'),
                               icon: const Icon(Icons.my_location_outlined),
                             ),
                     ),
@@ -449,15 +469,14 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
                   TextField(
                     controller: _descriptionController,
                     maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: 'Доп. описание',
-                      hintText:
-                          'Например: женская одежда, вечерние модели, доставка',
+                    decoration: InputDecoration(
+                      labelText: strings.t('extraDescriptionLabel'),
+                      hintText: strings.t('extraDescriptionHint'),
                     ),
                   ),
                   const SizedBox(height: 14),
                   _ImagePickerCard(
-                    title: 'Визитка магазина',
+                    title: strings.t('businessCardTitle'),
                     imagePath: _businessCardPath,
                     onGallery: _isSubmitting
                         ? null
@@ -482,8 +501,8 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
                         Expanded(
                           child: Text(
                             _isSubmitting
-                                ? 'Сохраняем магазин...'
-                                : 'Создать магазин',
+                                ? strings.t('savingShop')
+                                : strings.t('saveShop'),
                             style: textTheme.titleMedium?.copyWith(
                               color: const Color(0xFF04120F),
                               fontWeight: FontWeight.w700,
@@ -530,6 +549,7 @@ class _ShopLocationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
     final hasPoint = latitude != null && longitude != null;
 
     return Container(
@@ -543,7 +563,7 @@ class _ShopLocationCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Карта магазина',
+            strings.t('shopMapTitle'),
             style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
@@ -578,14 +598,14 @@ class _ShopLocationCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Поставь точку на карту',
+                    strings.t('mapPickPointTitle'),
                     style: textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Так потом можно будет открыть маршрут до магазина.',
+                    strings.t('mapPickPointDescription'),
                     textAlign: TextAlign.center,
                     style: textTheme.bodyMedium?.copyWith(
                       color: AppColors.textSecondary,
@@ -601,7 +621,11 @@ class _ShopLocationCard extends StatelessWidget {
                 child: FilledButton.tonalIcon(
                   onPressed: onPickOnMap,
                   icon: const Icon(Icons.map_outlined),
-                  label: Text(hasPoint ? 'Изменить точку' : 'Выбрать на карте'),
+                  label: Text(
+                    hasPoint
+                        ? strings.t('changePoint')
+                        : strings.t('pickOnMap'),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -609,7 +633,7 @@ class _ShopLocationCard extends StatelessWidget {
                 child: FilledButton.tonalIcon(
                   onPressed: onUseCurrentLocation,
                   icon: const Icon(Icons.my_location_outlined),
-                  label: const Text('Моя точка'),
+                  label: Text(strings.t('myPoint')),
                 ),
               ),
             ],
@@ -629,6 +653,7 @@ class _HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -651,7 +676,7 @@ class _HeroCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
-              'SHOP',
+              strings.t('heroShopBadge'),
               style: textTheme.labelLarge?.copyWith(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,
@@ -661,14 +686,14 @@ class _HeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'Новый магазин',
+            strings.t('newShop'),
             style: textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 6),
           Text(
-            'Фото обязательно. Остальное можно заполнить позже.',
+            strings.t('heroNewShopDescription'),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: textTheme.bodyMedium?.copyWith(
@@ -680,15 +705,15 @@ class _HeroCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _StatCard(
-                  value: hasPhoto ? 'Да' : 'Нет',
-                  label: 'Фото готово',
+                  value: hasPhoto ? strings.t('yes') : strings.t('no'),
+                  label: strings.t('photoReady'),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _StatCard(
                   value: totalShops.toString(),
-                  label: 'Всего магазинов',
+                  label: strings.t('totalShops'),
                 ),
               ),
             ],
@@ -779,6 +804,7 @@ class _ImagePickerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
     final previewImages = imagePaths.isNotEmpty
         ? imagePaths
         : imagePath.isEmpty
@@ -821,7 +847,7 @@ class _ImagePickerCard extends StatelessWidget {
                 child: FilledButton.tonalIcon(
                   onPressed: onGallery,
                   icon: const Icon(Icons.photo_library_outlined),
-                  label: const Text('Галерея'),
+                  label: Text(strings.t('gallery')),
                 ),
               ),
               const SizedBox(width: 12),
@@ -829,7 +855,7 @@ class _ImagePickerCard extends StatelessWidget {
                 child: FilledButton.tonalIcon(
                   onPressed: onCamera,
                   icon: const Icon(Icons.photo_camera_outlined),
-                  label: const Text('Камера'),
+                  label: Text(strings.t('camera')),
                 ),
               ),
             ],
@@ -837,7 +863,7 @@ class _ImagePickerCard extends StatelessWidget {
           const SizedBox(height: 12),
           if (previewImages.isEmpty)
             Text(
-              helperText ?? 'Можно выбрать из галереи или сфотографировать.',
+              helperText ?? strings.t('chooseOrTakePhoto'),
               style: textTheme.bodyMedium?.copyWith(
                 color: AppColors.textSecondary,
               ),

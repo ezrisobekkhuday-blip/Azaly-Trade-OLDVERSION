@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/product_presets.dart';
+import '../localization/app_strings.dart';
 import '../models/product.dart';
 import '../models/shop.dart';
 import '../services/api_client.dart';
@@ -10,11 +12,15 @@ import '../state/app_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/product_image.dart';
+import '../widgets/product_thumbnail_card.dart';
 import '../widgets/shop_map_preview.dart';
 import '../widgets/suggestion_field.dart';
 import 'image_gallery_page.dart';
 import 'photo_viewer_page.dart';
 import 'product_editor_sheet.dart';
+
+const double _pickedImageMaxDimension = 1440;
+const int _pickedImageQuality = 70;
 
 class ShopDetailsScreen extends StatefulWidget {
   const ShopDetailsScreen({
@@ -57,13 +63,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
   }
 
   double? get _draftTotal {
-    final amount = parseProductAmount(_amountController.text);
-
-    if (amount == null) {
-      return null;
-    }
-
-    return amount * _quantity;
+    return calculateNetTotal(_amountController.text, _quantity);
   }
 
   void _setQuantity(int value) {
@@ -92,7 +92,11 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
 
   Future<void> _pickFromGallery() async {
     try {
-      final files = await _picker.pickMultiImage(imageQuality: 74);
+      final files = await _picker.pickMultiImage(
+        imageQuality: _pickedImageQuality,
+        maxWidth: _pickedImageMaxDimension,
+        maxHeight: _pickedImageMaxDimension,
+      );
 
       if (!mounted || files.isEmpty) {
         return;
@@ -102,7 +106,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         _imagePaths.addAll(files.map((file) => file.path));
       });
     } catch (_) {
-      _showMessage('Не удалось открыть галерею.');
+      _showMessage(AppStrings.of(context).t('cannotOpenGallery'));
     }
   }
 
@@ -110,7 +114,9 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     try {
       final file = await _picker.pickImage(
         source: ImageSource.camera,
-        imageQuality: 74,
+        imageQuality: _pickedImageQuality,
+        maxWidth: _pickedImageMaxDimension,
+        maxHeight: _pickedImageMaxDimension,
       );
 
       if (!mounted || file == null) {
@@ -121,7 +127,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         _imagePaths.add(file.path);
       });
     } catch (_) {
-      _showMessage('Не удалось открыть камеру.');
+      _showMessage(AppStrings.of(context).t('cannotOpenCamera'));
     }
   }
 
@@ -133,7 +139,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     }
 
     if (_imagePaths.isEmpty) {
-      _showMessage('Сначала добавьте фото товара.');
+      _showMessage(AppStrings.of(context).t('addProductPhotoFirst'));
       return;
     }
 
@@ -165,14 +171,17 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         _quantity = 1;
         _quantityController.text = '1';
       });
-      _showMessage('Товар создан внутри магазина.');
+      _showMessage(AppStrings.of(context).t('productCreated'));
     } catch (error) {
       if (!mounted) {
         return;
       }
 
       _showMessage(
-        describeError(error, fallbackMessage: 'Не удалось создать товар.'),
+        describeError(
+          error,
+          fallbackMessage: AppStrings.of(context).t('cannotCreateProduct'),
+        ),
       );
     } finally {
       if (mounted) {
@@ -199,7 +208,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     try {
       await widget.store.updateProduct(updated);
       if (mounted) {
-        _showMessage('Товар обновлён.');
+        _showMessage(AppStrings.of(context).t('productUpdated'));
       }
     } catch (error) {
       if (!mounted) {
@@ -207,23 +216,25 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
       }
 
       _showMessage(
-        describeError(error, fallbackMessage: 'Не удалось обновить товар.'),
+        describeError(
+          error,
+          fallbackMessage: AppStrings.of(context).t('cannotUpdateProduct'),
+        ),
       );
     }
   }
 
   Future<void> _deleteProduct(Product product) async {
+    final strings = AppStrings.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Удалить товар?'),
-        content: const Text(
-          'Товар будет удалён без возможности восстановления.',
-        ),
+        title: Text(strings.t('deleteProductTitle')),
+        content: Text(strings.t('deleteProductMessage')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Отмена'),
+            child: Text(strings.t('cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -231,7 +242,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
               foregroundColor: AppColors.textPrimary,
             ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Удалить'),
+            child: Text(strings.t('delete')),
           ),
         ],
       ),
@@ -244,7 +255,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     try {
       await widget.store.deleteProduct(product.id);
       if (mounted) {
-        _showMessage('Товар удалён.');
+        _showMessage(strings.t('productDeleted'));
       }
     } catch (error) {
       if (!mounted) {
@@ -252,7 +263,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
       }
 
       _showMessage(
-        describeError(error, fallbackMessage: 'Не удалось удалить товар.'),
+        describeError(error, fallbackMessage: strings.t('cannotDeleteProduct')),
       );
     }
   }
@@ -261,24 +272,8 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     try {
       await widget.store.toggleFavorite(product.id);
       if (mounted) {
-        _showMessage('Товар перенесён в избранные.');
+        _showMessage(AppStrings.of(context).t('movedToFavorites'));
       }
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      _showMessage(
-        describeError(error, fallbackMessage: 'Не удалось обновить избранное.'),
-      );
-    }
-  }
-
-  Future<void> _changeQuantity(Product product, int nextQuantity) async {
-    final normalized = nextQuantity < 1 ? 1 : nextQuantity;
-
-    try {
-      await widget.store.updateProduct(product.copyWith(quantity: normalized));
     } catch (error) {
       if (!mounted) {
         return;
@@ -287,7 +282,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
       _showMessage(
         describeError(
           error,
-          fallbackMessage: 'Не удалось обновить количество.',
+          fallbackMessage: AppStrings.of(context).t('cannotUpdateFavorite'),
         ),
       );
     }
@@ -340,12 +335,13 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final shop = _shop;
+    final strings = AppStrings.of(context);
 
     if (shop == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Магазин')),
-        body: const AppBackground(
-          child: Center(child: Text('Магазин не найден')),
+        appBar: AppBar(title: Text(strings.t('shopsHeroTitle'))),
+        body: AppBackground(
+          child: Center(child: Text(strings.t('shopNotFound'))),
         ),
       );
     }
@@ -355,7 +351,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(shop.name.isEmpty ? 'Новый магазин' : shop.name),
+        title: Text(shop.name.isEmpty ? strings.t('newShop') : shop.name),
       ),
       body: AppBackground(
         child: SafeArea(
@@ -367,18 +363,21 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                 shop: shop,
                 onOpenPhoto: shop.photo.isEmpty
                     ? null
-                    : () => _openImagePreview('Фото магазина', shop.photo),
+                    : () =>
+                          _openImagePreview(strings.t('shopPhoto'), shop.photo),
                 onOpenStorefront: shop.storefrontImages.isEmpty
                     ? null
                     : (index) => _openImageGallery(
-                        'Фото витрины',
+                        strings.t('storefrontPhotos'),
                         shop.storefrontImages,
                         initialIndex: index,
                       ),
                 onOpenCard: shop.businessCardImage.isEmpty
                     ? null
-                    : () =>
-                          _openImagePreview('Визитка', shop.businessCardImage),
+                    : () => _openImagePreview(
+                        strings.t('businessCardShort'),
+                        shop.businessCardImage,
+                      ),
               ),
               const SizedBox(height: 18),
               Container(
@@ -392,14 +391,14 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Закуп товара',
+                      strings.t('purchaseTitle'),
                       style: textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Добавь фото, цену закупа, количество и нужные поля.',
+                      strings.t('purchaseDescription'),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.bodyMedium?.copyWith(
@@ -413,7 +412,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                           child: FilledButton.tonalIcon(
                             onPressed: _isSubmitting ? null : _pickFromGallery,
                             icon: const Icon(Icons.photo_library_outlined),
-                            label: const Text('Галерея'),
+                            label: Text(strings.t('gallery')),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -421,7 +420,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                           child: FilledButton.tonalIcon(
                             onPressed: _isSubmitting ? null : _takePhoto,
                             icon: const Icon(Icons.photo_camera_outlined),
-                            label: const Text('Камера'),
+                            label: Text(strings.t('camera')),
                           ),
                         ),
                       ],
@@ -430,7 +429,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                     _imagePaths.isEmpty
                         ? const _EmptyProductImages()
                         : SizedBox(
-                            height: 122,
+                            height: 148,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
                               itemCount: _imagePaths.length,
@@ -439,31 +438,13 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                               itemBuilder: (context, index) {
                                 final path = _imagePaths[index];
 
-                                return Stack(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(24),
-                                      child: ProductImage(
-                                        source: path,
-                                        width: 122,
-                                        height: 122,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                    Positioned(
-                                      right: 8,
-                                      top: 8,
-                                      child: IconButton.filledTonal(
-                                        onPressed: _isSubmitting
-                                            ? null
-                                            : () => setState(
-                                                () =>
-                                                    _imagePaths.removeAt(index),
-                                              ),
-                                        icon: const Icon(Icons.close, size: 18),
-                                      ),
-                                    ),
-                                  ],
+                                return ProductThumbnailCard(
+                                  source: path,
+                                  onRemove: _isSubmitting
+                                      ? null
+                                      : () => setState(
+                                          () => _imagePaths.removeAt(index),
+                                        ),
                                 );
                               },
                             ),
@@ -481,9 +462,9 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      decoration: const InputDecoration(
-                        labelText: 'Цена закупа',
-                        hintText: 'Например: 120 000',
+                      decoration: InputDecoration(
+                        labelText: strings.t('purchasePriceLabel'),
+                        hintText: strings.t('purchasePriceHint'),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -491,57 +472,59 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                       controller: _quantityController,
                       quantity: _quantity,
                       onChanged: _syncQuantityFromText,
-                      onDecrease: _isSubmitting
-                          ? null
-                          : () => _setQuantity(_quantity - 1),
-                      onIncrease: _isSubmitting
-                          ? null
-                          : () => _setQuantity(_quantity + 1),
                     ),
                     const SizedBox(height: 14),
                     SuggestionField(
                       controller: _colorController,
-                      label: 'Цвет',
-                      hint: 'Например: Black, Beige, Blue',
-                      suggestions: colorSuggestions,
-                      quickGroups: const [
+                      label: strings.t('colorLabel'),
+                      hint: strings.t('colorHint'),
+                      suggestions: localizedColorSuggestions(strings.language),
+                      quickGroups: [
                         SuggestionGroup(
-                          label: 'Популярные цвета',
-                          items: popularColorSuggestions,
+                          label: strings.t('popularColors'),
+                          items: localizedPopularColorSuggestions(
+                            strings.language,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 14),
                     SuggestionField(
                       controller: _materialController,
-                      label: 'Материал',
-                      hint: 'Например: Angora, Cotton, Leather',
-                      suggestions: materialSuggestions,
-                      quickGroups: const [
+                      label: strings.t('materialLabel'),
+                      hint: strings.t('materialHint'),
+                      suggestions: localizedMaterialSuggestions(
+                        strings.language,
+                      ),
+                      quickGroups: [
                         SuggestionGroup(
-                          label: 'Популярные',
-                          items: popularMaterialSuggestions,
+                          label: strings.t('popular'),
+                          items: localizedPopularMaterialSuggestions(
+                            strings.language,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 14),
                     SuggestionField(
                       controller: _sizeController,
-                      label: 'Размер',
-                      hint: 'Например: XL, 58, Standard',
-                      suggestions: sizeSuggestions,
-                      quickGroups: const [
+                      label: strings.t('sizeLabel'),
+                      hint: strings.t('sizeHint'),
+                      suggestions: localizedSizeSuggestions(strings.language),
+                      quickGroups: [
                         SuggestionGroup(
-                          label: 'Буквенные размеры',
+                          label: strings.t('alphaSizes'),
                           items: alphaSizeSuggestions,
                         ),
                         SuggestionGroup(
-                          label: 'Числовые размеры',
+                          label: strings.t('numericSizes'),
                           items: numericSizeSuggestions,
                         ),
                         SuggestionGroup(
-                          label: 'Особые',
-                          items: specialSizeSuggestions,
+                          label: strings.t('specialSizes'),
+                          items: localizedSpecialSizeSuggestions(
+                            strings.language,
+                          ),
                         ),
                       ],
                       allowMultiSelect: true,
@@ -556,8 +539,8 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                       onPressed: _isSubmitting ? null : _createProduct,
                       child: Text(
                         _isSubmitting
-                            ? 'Сохраняем закуп...'
-                            : 'Сохранить закуп',
+                            ? strings.t('savingPurchase')
+                            : strings.t('savePurchase'),
                       ),
                     ),
                   ],
@@ -565,7 +548,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
               ),
               const SizedBox(height: 18),
               Text(
-                'Закупы магазина',
+                strings.t('shopPurchases'),
                 style: textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
@@ -582,19 +565,6 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                       onEdit: () => _openEditor(product),
                       onDelete: () => _deleteProduct(product),
                       onToggleFavorite: () => _toggleFavorite(product),
-                      onDecreaseQuantity: () =>
-                          _changeQuantity(product, product.quantity - 1),
-                      onIncreaseQuantity: () =>
-                          _changeQuantity(product, product.quantity + 1),
-                      onSubmitQuantity: (value) {
-                        final parsed = int.tryParse(value.trim());
-
-                        if (parsed == null) {
-                          return;
-                        }
-
-                        _changeQuantity(product, parsed);
-                      },
                       onOpenImage: (index) => _openViewer(product, index),
                     ),
                   ),
@@ -634,15 +604,17 @@ class _ShopHero extends StatelessWidget {
     }
 
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не удалось открыть маршрут.')),
-      );
+      final strings = AppStrings.of(context);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(strings.t('cannotOpenRoute'))));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -675,7 +647,7 @@ class _ShopHero extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            shop.name.isEmpty ? 'Новый магазин' : shop.name,
+            shop.name.isEmpty ? strings.t('newShop') : shop.name,
             style: textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.w800,
             ),
@@ -702,7 +674,7 @@ class _ShopHero extends StatelessWidget {
           if (shop.storefrontImages.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(
-              'Фото витрины',
+              strings.t('storefrontPhotos'),
               style: textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -755,7 +727,7 @@ class _ShopHero extends StatelessWidget {
               child: FilledButton.tonalIcon(
                 onPressed: () => _openRoute(context),
                 icon: const Icon(Icons.route_outlined),
-                label: const Text('Открыть маршрут'),
+                label: Text(strings.t('openRoute')),
               ),
             ),
           ],
@@ -764,12 +736,12 @@ class _ShopHero extends StatelessWidget {
             spacing: 10,
             runSpacing: 10,
             children: [
-              _Pill(label: '${shop.productsCount} товаров'),
+              _Pill(label: strings.formatShopItemCount(shop.productsCount)),
               if (shop.businessCardImage.isNotEmpty)
                 FilledButton.tonalIcon(
                   onPressed: onOpenCard,
                   icon: const Icon(Icons.badge_outlined),
-                  label: const Text('Визитка'),
+                  label: Text(strings.t('businessCardShort')),
                 ),
             ],
           ),
@@ -803,6 +775,8 @@ class _EmptyProductImages extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 26),
@@ -811,10 +785,7 @@ class _EmptyProductImages extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: AppColors.border),
       ),
-      child: const Text(
-        'Добавь фото товара, затем заполни сумму, материал и размер.',
-        textAlign: TextAlign.center,
-      ),
+      child: Text(strings.t('emptyProductImages'), textAlign: TextAlign.center),
     );
   }
 }
@@ -824,6 +795,8 @@ class _EmptyShopProducts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
       decoration: BoxDecoration(
@@ -831,11 +804,15 @@ class _EmptyShopProducts extends StatelessWidget {
         borderRadius: BorderRadius.circular(32),
         border: Border.all(color: AppColors.border),
       ),
-      child: const Column(
+      child: Column(
         children: [
-          Icon(Icons.inventory_2_outlined, size: 34, color: AppColors.accent),
-          SizedBox(height: 14),
-          Text('В этом магазине пока нет товаров'),
+          const Icon(
+            Icons.inventory_2_outlined,
+            size: 34,
+            color: AppColors.accent,
+          ),
+          const SizedBox(height: 14),
+          Text(strings.t('emptyShopProducts')),
         ],
       ),
     );
@@ -848,9 +825,6 @@ class _ShopProductCard extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onToggleFavorite,
-    required this.onDecreaseQuantity,
-    required this.onIncreaseQuantity,
-    required this.onSubmitQuantity,
     required this.onOpenImage,
   });
 
@@ -858,14 +832,13 @@ class _ShopProductCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onToggleFavorite;
-  final VoidCallback onDecreaseQuantity;
-  final VoidCallback onIncreaseQuantity;
-  final ValueChanged<String> onSubmitQuantity;
   final ValueChanged<int> onOpenImage;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
+    final language = strings.language;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -900,22 +873,14 @@ class _ShopProductCard extends StatelessWidget {
           _InlineTotalCard(product: product),
           const SizedBox(height: 16),
           SizedBox(
-            height: 110,
+            height: 148,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: product.imagePaths.length,
               separatorBuilder: (_, index) => const SizedBox(width: 12),
-              itemBuilder: (context, index) => InkWell(
+              itemBuilder: (context, index) => ProductThumbnailCard(
+                source: product.imagePaths[index],
                 onTap: () => onOpenImage(index),
-                borderRadius: BorderRadius.circular(24),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: ProductImage(
-                    source: product.imagePaths[index],
-                    width: 110,
-                    height: 110,
-                  ),
-                ),
               ),
             ),
           ),
@@ -925,37 +890,40 @@ class _ShopProductCard extends StatelessWidget {
             runSpacing: 10,
             children: [
               _MiniInfo(
-                label: 'Цена',
-                value: product.amount.isEmpty ? 'Не указано' : product.amount,
+                label: strings.t('priceLabel'),
+                value: product.amount.isEmpty
+                    ? strings.t('notSpecified')
+                    : product.amount,
               ),
               _MiniInfo(
-                label: 'Итог',
+                label: strings.t('totalLabel'),
                 value: product.totalValue == null
-                    ? 'Не указано'
+                    ? strings.t('notSpecified')
                     : formatProductMoney(product.totalValue!),
               ),
               _MiniInfo(
-                label: 'Цвет',
-                value: product.color.isEmpty ? 'Не указано' : product.color,
+                label: strings.t('piecesLabel'),
+                value: '${product.quantity}',
               ),
               _MiniInfo(
-                label: 'Материал',
+                label: strings.t('colorLabel'),
+                value: product.color.isEmpty
+                    ? strings.t('notSpecified')
+                    : localizeColorValue(language, product.color),
+              ),
+              _MiniInfo(
+                label: strings.t('materialLabel'),
                 value: product.material.isEmpty
-                    ? 'Не указано'
-                    : product.material,
+                    ? strings.t('notSpecified')
+                    : localizeMaterialValue(language, product.material),
               ),
               _MiniInfo(
-                label: 'Размер',
-                value: product.size.isEmpty ? 'Не указано' : product.size,
+                label: strings.t('sizeLabel'),
+                value: product.size.isEmpty
+                    ? strings.t('notSpecified')
+                    : localizeSizeValue(language, product.size),
               ),
             ],
-          ),
-          const SizedBox(height: 16),
-          _QuantityAdjuster(
-            quantity: product.quantity,
-            onDecrease: onDecreaseQuantity,
-            onIncrease: onIncreaseQuantity,
-            onSubmitted: onSubmitQuantity,
           ),
           const SizedBox(height: 16),
           Row(
@@ -964,7 +932,7 @@ class _ShopProductCard extends StatelessWidget {
                 child: FilledButton.tonalIcon(
                   onPressed: onEdit,
                   icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Редактировать'),
+                  label: Text(strings.t('edit')),
                 ),
               ),
               const SizedBox(width: 12),
@@ -976,7 +944,7 @@ class _ShopProductCard extends StatelessWidget {
                     foregroundColor: AppColors.textPrimary,
                   ),
                   icon: const Icon(Icons.delete_outline),
-                  label: const Text('Удалить'),
+                  label: Text(strings.t('delete')),
                 ),
               ),
             ],
@@ -1001,6 +969,9 @@ class _PurchaseSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
+    final grossTotal = calculateGrossTotal(amount, quantity);
+    final supplierShare = calculateSupplierShare(amount, quantity);
 
     return Container(
       width: double.infinity,
@@ -1014,20 +985,36 @@ class _PurchaseSummaryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Итог закупа',
+            strings.t('purchaseTotalTitle'),
             style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           Text(
             total == null
-                ? 'Укажи цену и количество'
-                : '${amount.trim().isEmpty ? '0' : amount.trim()} × $quantity = ${formatProductMoney(total!)}',
+                ? strings.t('enterPriceAndQuantity')
+                : '${amount.trim().isEmpty ? '0' : amount.trim()} × $quantity = ${formatProductMoney(grossTotal!)}',
             style: textTheme.bodyLarge?.copyWith(
               color: total == null
                   ? AppColors.textSecondary
                   : AppColors.textPrimary,
             ),
           ),
+          if (total != null && supplierShare != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${strings.t('supplierShareLabel')}: -${formatProductMoney(supplierShare)}',
+              style: textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${strings.t('totalLabel')}: ${formatProductMoney(total!)}',
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1039,19 +1026,16 @@ class _QuantityStepper extends StatelessWidget {
     required this.controller,
     required this.quantity,
     required this.onChanged,
-    required this.onDecrease,
-    required this.onIncrease,
   });
 
   final TextEditingController controller;
   final int quantity;
   final ValueChanged<String> onChanged;
-  final VoidCallback? onDecrease;
-  final VoidCallback? onIncrease;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1064,39 +1048,17 @@ class _QuantityStepper extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Количество',
+            strings.t('quantityLabel'),
             style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              IconButton.filledTonal(
-                onPressed: quantity > 1 ? onDecrease : null,
-                icon: const Icon(Icons.remove),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  onChanged: onChanged,
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  decoration: const InputDecoration(
-                    labelText: 'Штук',
-                    hintText: '1',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              IconButton.filled(
-                onPressed: onIncrease,
-                style: IconButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: const Color(0xFF08110F),
-                ),
-                icon: const Icon(Icons.add),
-              ),
-            ],
+          TextField(
+            controller: controller,
+            onChanged: onChanged,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: const InputDecoration(hintText: '1'),
           ),
         ],
       ),
@@ -1112,7 +1074,10 @@ class _InlineTotalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = product.totalValue;
+    final grossTotal = product.grossTotalValue;
+    final supplierShare = product.supplierShareValue;
     final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
 
     return Container(
       width: double.infinity,
@@ -1125,85 +1090,32 @@ class _InlineTotalCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Итог закупа',
+            strings.t('purchaseTotalTitle'),
             style: textTheme.labelLarge?.copyWith(color: AppColors.textMuted),
           ),
           const SizedBox(height: 6),
           Text(
             total == null
-                ? 'Цена не указана'
-                : '${product.amount} × ${product.quantity} = ${formatProductMoney(total)}',
+                ? strings.t('priceNotSpecified')
+                : '${product.amount} × ${product.quantity} = ${formatProductMoney(grossTotal!)}',
             style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QuantityAdjuster extends StatelessWidget {
-  const _QuantityAdjuster({
-    required this.quantity,
-    required this.onDecrease,
-    required this.onIncrease,
-    required this.onSubmitted,
-  });
-
-  final int quantity;
-  final VoidCallback onDecrease;
-  final VoidCallback onIncrease;
-  final ValueChanged<String> onSubmitted;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceStrong,
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Row(
-        children: [
-          Text(
-            'Количество',
-            style: textTheme.bodyMedium?.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const Spacer(),
-          IconButton.filledTonal(
-            onPressed: quantity > 1 ? onDecrease : null,
-            icon: const Icon(Icons.remove),
-          ),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 78,
-            child: TextFormField(
-              initialValue: '$quantity',
-              onFieldSubmitted: onSubmitted,
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              decoration: const InputDecoration(
-                labelText: 'Штук',
-                hintText: '1',
-                isDense: true,
+          if (total != null && supplierShare != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${strings.t('supplierShareLabel')}: -${formatProductMoney(supplierShare)}',
+              style: textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
               ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${strings.t('totalLabel')}: ${formatProductMoney(total)}',
               style: textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-          IconButton.filled(
-            onPressed: onIncrease,
-            style: IconButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: const Color(0xFF08110F),
-            ),
-            icon: const Icon(Icons.add),
-          ),
+          ],
         ],
       ),
     );
