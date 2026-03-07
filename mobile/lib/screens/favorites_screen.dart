@@ -1,0 +1,429 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
+
+import '../models/product.dart';
+import '../state/app_store.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_background.dart';
+import 'products_screen.dart';
+
+class FavoritesScreen extends StatelessWidget {
+  const FavoritesScreen({super.key, required this.store});
+
+  final AppStore store;
+
+  Future<void> _toggleFavorite(BuildContext context, Product product) async {
+    await store.toggleFavorite(product.id);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Товар убран из избранного.')),
+      );
+    }
+  }
+
+  Future<void> _openViewer(BuildContext context, Product product, int initialIndex) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => PhotoViewerPage(
+          product: product,
+          initialIndex: initialIndex,
+        ),
+        fullscreenDialog: true,
+      ),
+    );
+  }
+
+  Future<void> _shareProduct(BuildContext context, Product product) async {
+    final files = product.imagePaths
+        .where((path) => File(path).existsSync())
+        .map(XFile.new)
+        .toList();
+
+    final summary = [
+      'Избранный товар из Azaly Trade',
+      'Сумма: ${product.amount.isEmpty ? 'Не указано' : product.amount}',
+      'Материал: ${product.material.isEmpty ? 'Не указано' : product.material}',
+      'Размер: ${product.size.isEmpty ? 'Не указано' : product.size}',
+      'Статус: ${product.status}',
+    ].join('\n');
+
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          title: 'Azaly Trade',
+          subject: 'Избранный товар',
+          text: summary,
+          files: files.isEmpty ? null : files,
+        ),
+      );
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Открылось меню "Поделиться". Можно выбрать Telegram.'),
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось открыть меню "Поделиться".')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final favorites = store.favoriteProducts;
+    final textTheme = Theme.of(context).textTheme;
+
+    return AppBackground(
+      child: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 132),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(32),
+                border: Border.all(color: AppColors.border),
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0x24FF7D93),
+                    Color(0x147C92FF),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x33000000),
+                    blurRadius: 28,
+                    offset: Offset(0, 18),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.danger.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      'FAVORITES',
+                      style: textTheme.labelLarge?.copyWith(
+                        color: AppColors.danger,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Избранные',
+                    style: textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Сюда попадают любимые товары. Здесь можно открыть фото и отправить карточку через Telegram или другое приложение.',
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: AppColors.textSecondary,
+                      height: 1.55,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0x73060A14),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          favorites.length.toString(),
+                          style: textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Любимых товаров',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            if (favorites.isEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(32),
+                  border: Border.all(color: AppColors.border),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x33000000),
+                      blurRadius: 28,
+                      offset: Offset(0, 18),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.favorite_border,
+                      size: 36,
+                      color: AppColors.danger,
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Пока нет избранного',
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Нажми на сердечко у товара во второй вкладке, и он появится здесь.',
+                      textAlign: TextAlign.center,
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: AppColors.textSecondary,
+                        height: 1.55,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ...favorites.map(
+                (product) => Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: FavoriteProductCard(
+                    product: product,
+                    onOpenImage: (index) => _openViewer(context, product, index),
+                    onShare: () => _shareProduct(context, product),
+                    onUnfavorite: () => _toggleFavorite(context, product),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class FavoriteProductCard extends StatelessWidget {
+  const FavoriteProductCard({
+    super.key,
+    required this.product,
+    required this.onOpenImage,
+    required this.onShare,
+    required this.onUnfavorite,
+  });
+
+  final Product product;
+  final ValueChanged<int> onOpenImage;
+  final VoidCallback onShare;
+  final VoidCallback onUnfavorite;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: AppColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 28,
+            offset: Offset(0, 18),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.danger.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  'ИЗБРАННЫЙ',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: AppColors.danger,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                formatProductDate(product.createdAt),
+                style: textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textMuted,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Icon(
+                Icons.favorite,
+                color: AppColors.danger,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 110,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: product.imagePaths.length,
+              separatorBuilder: (_, index) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                return InkWell(
+                  borderRadius: BorderRadius.circular(24),
+                  onTap: () => onOpenImage(index),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Image.file(
+                      File(product.imagePaths[index]),
+                      width: 110,
+                      height: 110,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _InfoTile(
+                  label: 'Сумма',
+                  value: product.amount.isEmpty ? 'Не указано' : product.amount,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _InfoTile(
+                  label: 'Материал',
+                  value: product.material.isEmpty ? 'Не указано' : product.material,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _InfoTile(
+                  label: 'Размер',
+                  value: product.size.isEmpty ? 'Не указано' : product.size,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: const Color(0xFF08110F),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                  ),
+                  onPressed: onShare,
+                  icon: const Icon(Icons.share_outlined),
+                  label: const Text('Поделиться'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                    backgroundColor: AppColors.surfaceStrong,
+                    foregroundColor: AppColors.textPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(22),
+                      side: const BorderSide(color: AppColors.border),
+                    ),
+                  ),
+                  onPressed: onUnfavorite,
+                  icon: const Icon(Icons.heart_broken_outlined),
+                  label: const Text('Убрать'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoTile extends StatelessWidget {
+  const _InfoTile({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceStrong,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: textTheme.bodySmall?.copyWith(
+              color: AppColors.textMuted,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
