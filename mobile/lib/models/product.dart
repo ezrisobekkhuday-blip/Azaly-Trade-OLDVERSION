@@ -1,6 +1,8 @@
 class Product {
   const Product({
     required this.id,
+    required this.shopId,
+    required this.shopName,
     required this.imagePaths,
     required this.amount,
     required this.material,
@@ -11,6 +13,8 @@ class Product {
   });
 
   final String id;
+  final String shopId;
+  final String shopName;
   final List<String> imagePaths;
   final String amount;
   final String material;
@@ -20,6 +24,8 @@ class Product {
   final bool isFavorite;
 
   Product copyWith({
+    String? shopId,
+    String? shopName,
     List<String>? imagePaths,
     String? amount,
     String? material,
@@ -29,6 +35,8 @@ class Product {
   }) {
     return Product(
       id: id,
+      shopId: shopId ?? this.shopId,
+      shopName: shopName ?? this.shopName,
       imagePaths: imagePaths ?? this.imagePaths,
       amount: amount ?? this.amount,
       material: material ?? this.material,
@@ -39,19 +47,6 @@ class Product {
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'imagePaths': imagePaths,
-      'amount': amount,
-      'material': material,
-      'size': size,
-      'status': status,
-      'createdAt': createdAt.toIso8601String(),
-      'isFavorite': isFavorite,
-    };
-  }
-
   factory Product.fromJson(Map<String, dynamic> json) {
     final rawImages = json['imagePaths'] ?? json['images'];
     final rawCreatedAt = json['createdAt'] ?? json['created_at'];
@@ -59,6 +54,9 @@ class Product {
 
     return Product(
       id: '${json['id'] ?? ''}',
+      shopId: '${json['shopId'] ?? json['shop_id'] ?? ''}',
+      shopName:
+          json['shopName'] as String? ?? json['shop_name'] as String? ?? '',
       imagePaths: List<String>.from(rawImages as List<dynamic>? ?? const []),
       amount: json['amount'] as String? ?? '',
       material: json['material'] as String? ?? '',

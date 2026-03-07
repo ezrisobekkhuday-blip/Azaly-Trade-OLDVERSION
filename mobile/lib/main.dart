@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'screens/create_product_screen.dart';
+import 'screens/create_shop_screen.dart';
 import 'screens/favorites_screen.dart';
-import 'screens/products_screen.dart';
+import 'screens/shops_screen.dart';
 import 'services/api_client.dart';
 import 'state/app_store.dart';
 import 'theme/app_theme.dart';
@@ -99,11 +99,11 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-      CreateProductScreen(
+      CreateShopScreen(
         store: widget.store,
-        onOpenProducts: () => setState(() => _selectedIndex = 1),
+        onOpenShops: () => setState(() => _selectedIndex = 1),
       ),
-      ProductsScreen(store: widget.store),
+      ShopsScreen(store: widget.store),
       FavoritesScreen(store: widget.store),
     ];
 
@@ -137,14 +137,14 @@ class _HomeShellState extends State<HomeShell> {
                 setState(() => _selectedIndex = value),
             destinations: const [
               NavigationDestination(
-                icon: Icon(Icons.add_circle_outline),
-                selectedIcon: Icon(Icons.add_circle),
+                icon: Icon(Icons.add_business_outlined),
+                selectedIcon: Icon(Icons.add_business),
                 label: 'Создать',
               ),
               NavigationDestination(
-                icon: Icon(Icons.shopping_bag_outlined),
-                selectedIcon: Icon(Icons.shopping_bag),
-                label: 'Товары',
+                icon: Icon(Icons.storefront_outlined),
+                selectedIcon: Icon(Icons.storefront),
+                label: 'Магазины',
               ),
               NavigationDestination(
                 icon: Icon(Icons.favorite_border),

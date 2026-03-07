@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../data/product_presets.dart';
 import '../models/product.dart';
 import '../theme/app_theme.dart';
 import '../widgets/product_image.dart';
+import '../widgets/suggestion_field.dart';
 
 class ProductEditorSheet extends StatefulWidget {
   const ProductEditorSheet({super.key, required this.product});
@@ -132,7 +134,7 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Можно поменять фото, сумму, материал и размер.',
+                            'Фото можно поменять, а материал и размер выбрать из подсказок или ввести вручную.',
                             style: textTheme.bodyLarge?.copyWith(
                               color: AppColors.textSecondary,
                             ),
@@ -219,20 +221,39 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                TextField(
+                SuggestionField(
                   controller: _materialController,
-                  decoration: const InputDecoration(
-                    labelText: 'Материал',
-                    hintText: 'Например: кожа',
-                  ),
+                  label: 'Материал',
+                  hint: 'Например: Angora, Cotton, Leather',
+                  suggestions: materialSuggestions,
+                  quickGroups: const [
+                    SuggestionGroup(
+                      label: 'Популярные',
+                      items: popularMaterialSuggestions,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 14),
-                TextField(
+                SuggestionField(
                   controller: _sizeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Размер',
-                    hintText: 'Например: 42 x 30',
-                  ),
+                  label: 'Размер',
+                  hint: 'Например: XL, 58, Standard',
+                  suggestions: sizeSuggestions,
+                  quickGroups: const [
+                    SuggestionGroup(
+                      label: 'Буквенные размеры',
+                      items: alphaSizeSuggestions,
+                    ),
+                    SuggestionGroup(
+                      label: 'Числовые размеры',
+                      items: numericSizeSuggestions,
+                    ),
+                    SuggestionGroup(
+                      label: 'Особые',
+                      items: specialSizeSuggestions,
+                    ),
+                  ],
+                  allowMultiSelect: true,
                 ),
                 const SizedBox(height: 18),
                 SizedBox(

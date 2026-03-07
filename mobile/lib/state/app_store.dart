@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/product.dart';
+import '../models/shop.dart';
 import '../services/api_client.dart';
 
 class AppStore extends ChangeNotifier {
@@ -9,25 +10,48 @@ class AppStore extends ChangeNotifier {
   final ApiClient _apiClient;
   bool _isReady = false;
   String _displayName = 'Azaly Trade';
+  final List<Shop> _shops = [];
   final List<Product> _products = [];
 
   bool get isReady => _isReady;
   String get displayName => _displayName;
+  List<Shop> get shops => List.unmodifiable(_shops);
   List<Product> get allProducts => List.unmodifiable(_products);
-  List<Product> get products =>
-      List.unmodifiable(_products.where((product) => !product.isFavorite));
   List<Product> get favoriteProducts =>
       List.unmodifiable(_products.where((product) => product.isFavorite));
+
+  Shop? shopById(String shopId) {
+    for (final shop in _shops) {
+      if (shop.id == shopId) {
+        return shop;
+      }
+    }
+
+    return null;
+  }
+
+  List<Product> productsForShop(String shopId) {
+    return List.unmodifiable(
+      _products.where(
+        (product) => product.shopId == shopId && !product.isFavorite,
+      ),
+    );
+  }
 
   Future<void> load() async {
     try {
       final bootstrap = await _apiClient.fetchBootstrap();
       _displayName = bootstrap.displayName;
+      _shops
+        ..clear()
+        ..addAll(bootstrap.shops);
       _products
         ..clear()
         ..addAll(bootstrap.products);
+      _syncShopCounts();
     } catch (_) {
       _displayName = 'Azaly Trade';
+      _shops.clear();
       _products.clear();
     }
 
@@ -44,7 +68,33 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> createShop({
+    required String name,
+    required String photoPath,
+    required String location,
+    required String description,
+    required String businessCardPath,
+  }) async {
+    final photo = await _prepareSingleImage(photoPath);
+    final businessCard = businessCardPath.trim().isEmpty
+        ? ''
+        : await _prepareSingleImage(businessCardPath);
+
+    final createdShop = await _apiClient.createShop(
+      name: name.trim(),
+      photo: photo,
+      location: location.trim(),
+      description: description.trim(),
+      businessCardImage: businessCard,
+    );
+
+    _shops.insert(0, createdShop);
+    _syncShopCounts();
+    notifyListeners();
+  }
+
   Future<void> createProduct({
+    required String shopId,
     required List<String> imagePaths,
     required String amount,
     required String material,
@@ -52,6 +102,7 @@ class AppStore extends ChangeNotifier {
   }) async {
     final preparedImages = await _prepareImagePaths(imagePaths);
     final createdProduct = await _apiClient.createProduct(
+      shopId: shopId,
       images: preparedImages,
       amount: amount.trim(),
       material: material.trim(),
@@ -59,6 +110,7 @@ class AppStore extends ChangeNotifier {
     );
 
     _products.insert(0, createdProduct);
+    _syncShopCounts();
     notifyListeners();
   }
 
@@ -77,12 +129,14 @@ class AppStore extends ChangeNotifier {
     final serverProduct = await _apiClient.updateProduct(preparedProduct);
 
     _products[index] = serverProduct;
+    _syncShopCounts();
     notifyListeners();
   }
 
   Future<void> deleteProduct(String productId) async {
     await _apiClient.deleteProduct(productId);
     _products.removeWhere((product) => product.id == productId);
+    _syncShopCounts();
     notifyListeners();
   }
 
@@ -100,6 +154,15 @@ class AppStore extends ChangeNotifier {
 
     _products[index] = serverProduct;
     notifyListeners();
+  }
+
+  Future<String> _prepareSingleImage(String imagePath) async {
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
+
+    final uploaded = await _apiClient.uploadImages([imagePath]);
+    return uploaded.first;
   }
 
   Future<List<String>> _prepareImagePaths(List<String> imagePaths) async {
@@ -125,6 +188,19 @@ class AppStore extends ChangeNotifier {
       uploadedIndex += 1;
       return remotePath;
     }).toList();
+  }
+
+  void _syncShopCounts() {
+    final counts = <String, int>{};
+
+    for (final product in _products) {
+      counts.update(product.shopId, (value) => value + 1, ifAbsent: () => 1);
+    }
+
+    for (var index = 0; index < _shops.length; index += 1) {
+      final shop = _shops[index];
+      _shops[index] = shop.copyWith(productsCount: counts[shop.id] ?? 0);
+    }
   }
 
   @override

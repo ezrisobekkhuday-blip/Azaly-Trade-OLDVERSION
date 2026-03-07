@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/product.dart';
+import '../models/shop.dart';
 
 class ApiClient {
   ApiClient({http.Client? client})
@@ -17,22 +18,28 @@ class ApiClient {
   Future<AppBootstrap> fetchBootstrap() async {
     final responses = await Future.wait([
       _client.get(_uri('/profile')),
+      _client.get(_uri('/shops')),
       _client.get(_uri('/products')),
     ]);
 
     final profilePayload = _decodeResponse(responses[0]);
-    final productsPayload = _decodeResponse(responses[1]);
+    final shopsPayload = _decodeResponse(responses[1]);
+    final productsPayload = _decodeResponse(responses[2]);
 
     if (profilePayload is! Map<String, dynamic>) {
       throw const ApiException('Invalid profile response.');
     }
 
-    if (productsPayload is! List) {
-      throw const ApiException('Invalid products response.');
+    if (shopsPayload is! List || productsPayload is! List) {
+      throw const ApiException('Invalid catalog response.');
     }
 
     return AppBootstrap(
       displayName: _readProfileName(profilePayload),
+      shops: shopsPayload
+          .whereType<Map<String, dynamic>>()
+          .map(Shop.fromJson)
+          .toList(),
       products: productsPayload
           .whereType<Map<String, dynamic>>()
           .map(Product.fromJson)
@@ -78,7 +85,36 @@ class ApiClient {
     return payload.map((item) => item.toString()).toList();
   }
 
+  Future<Shop> createShop({
+    required String name,
+    required String photo,
+    required String location,
+    required String description,
+    required String businessCardImage,
+  }) async {
+    final response = await _client.post(
+      _uri('/shops'),
+      headers: _jsonHeaders,
+      body: jsonEncode({
+        'name': name,
+        'photo': photo,
+        'location': location,
+        'description': description,
+        'business_card_image': businessCardImage,
+      }),
+    );
+
+    final payload = _decodeResponse(response);
+
+    if (payload is! Map<String, dynamic>) {
+      throw const ApiException('Invalid shop response.');
+    }
+
+    return Shop.fromJson(payload);
+  }
+
   Future<Product> createProduct({
+    required String shopId,
     required List<String> images,
     required String amount,
     required String material,
@@ -89,6 +125,7 @@ class ApiClient {
       _uri('/products'),
       headers: _jsonHeaders,
       body: jsonEncode({
+        'shop_id': int.parse(shopId),
         'images': images,
         'amount': amount,
         'material': material,
@@ -111,6 +148,7 @@ class ApiClient {
       _uri('/products/${product.id}'),
       headers: _jsonHeaders,
       body: jsonEncode({
+        'shop_id': int.parse(product.shopId),
         'images': product.imagePaths,
         'amount': product.amount,
         'material': product.material,
@@ -180,9 +218,14 @@ class ApiClient {
 }
 
 class AppBootstrap {
-  const AppBootstrap({required this.displayName, required this.products});
+  const AppBootstrap({
+    required this.displayName,
+    required this.shops,
+    required this.products,
+  });
 
   final String displayName;
+  final List<Shop> shops;
   final List<Product> products;
 }
 
