@@ -27,10 +27,12 @@ class ShopDetailsScreen extends StatefulWidget {
     super.key,
     required this.store,
     required this.shopId,
+    this.initialStorefrontIndex,
   });
 
   final AppStore store;
   final String shopId;
+  final int? initialStorefrontIndex;
 
   @override
   State<ShopDetailsScreen> createState() => _ShopDetailsScreenState();
@@ -50,8 +52,15 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
   int _quantity = 1;
   bool _isSubmitting = false;
   bool _isPurchaseFormExpanded = true;
+  String? _pendingStorefrontImagePath;
 
   Shop? get _shop => widget.store.shopById(widget.shopId);
+
+  @override
+  void initState() {
+    super.initState();
+    _applyInitialStorefrontDraft();
+  }
 
   @override
   void dispose() {
@@ -65,6 +74,31 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
 
   double? get _draftTotal {
     return calculateNetTotal(_amountController.text, _quantity);
+  }
+
+  void _applyInitialStorefrontDraft() {
+    final storefrontIndex = widget.initialStorefrontIndex;
+    final shop = _shop;
+
+    if (storefrontIndex == null ||
+        shop == null ||
+        storefrontIndex < 0 ||
+        storefrontIndex >= shop.storefrontItems.length) {
+      return;
+    }
+
+    final item = shop.storefrontItems[storefrontIndex];
+    _imagePaths
+      ..clear()
+      ..add(item.imagePath);
+    _amountController.text = item.amount;
+    _colorController.text = item.color;
+    _materialController.text = item.material;
+    _sizeController.text = item.size;
+    _quantity = 1;
+    _quantityController.text = '1';
+    _isPurchaseFormExpanded = true;
+    _pendingStorefrontImagePath = item.imagePath;
   }
 
   void _setQuantity(int value) {
@@ -159,6 +193,23 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         size: _sizeController.text,
       );
 
+      final storefrontImagePath = _pendingStorefrontImagePath;
+      if (storefrontImagePath != null) {
+        final storefrontIndex = _shop?.storefrontItems.indexWhere(
+          (item) => item.imagePath == storefrontImagePath,
+        );
+
+        if (storefrontIndex != null && storefrontIndex >= 0) {
+          try {
+            await widget.store.removeStorefrontItem(shop.id, storefrontIndex);
+          } catch (_) {
+            if (mounted) {
+              _showMessage(AppStrings.of(context).t('cannotUpdateShop'));
+            }
+          }
+        }
+      }
+
       if (!mounted) {
         return;
       }
@@ -172,6 +223,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         _quantity = 1;
         _quantityController.text = '1';
         _isPurchaseFormExpanded = false;
+        _pendingStorefrontImagePath = null;
       });
       _showMessage(AppStrings.of(context).t('productCreated'));
     } catch (error) {
@@ -270,13 +322,23 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     }
   }
 
-  Future<void> _toggleFavorite(Product product) async {
+  Future<void> _toggleStorefrontFavorite(int storefrontIndex) async {
+    final shop = _shop;
+
+    if (shop == null ||
+        storefrontIndex < 0 ||
+        storefrontIndex >= shop.storefrontItems.length) {
+      return;
+    }
+
+    final item = shop.storefrontItems[storefrontIndex];
+
     try {
-      await widget.store.toggleFavorite(product.id);
+      await widget.store.toggleStorefrontFavorite(shop.id, storefrontIndex);
       if (mounted) {
         final strings = AppStrings.of(context);
         _showMessage(
-          product.isFavorite
+          item.isFavorite
               ? strings.t('favoriteRemoved')
               : strings.t('favoriteMarked'),
         );
@@ -607,6 +669,8 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                             strings.t('businessCardShort'),
                             shop.businessCardImage,
                           ),
+                    onToggleStorefrontFavorite: (index) =>
+                        _toggleStorefrontFavorite(index),
                   ),
                   const SizedBox(height: 18),
                   _buildPurchaseComposer(context, strings, textTheme),
@@ -628,7 +692,6 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                           product: product,
                           onEdit: () => _openEditor(product),
                           onDelete: () => _deleteProduct(product),
-                          onToggleFavorite: () => _toggleFavorite(product),
                           onOpenImage: (index) => _openViewer(product, index),
                         ),
                       ),
@@ -649,12 +712,14 @@ class _ShopHero extends StatelessWidget {
     required this.onOpenPhoto,
     required this.onOpenStorefront,
     required this.onOpenCard,
+    required this.onToggleStorefrontFavorite,
   });
 
   final Shop shop;
   final VoidCallback? onOpenPhoto;
   final ValueChanged<int>? onOpenStorefront;
   final VoidCallback? onOpenCard;
+  final ValueChanged<int>? onToggleStorefrontFavorite;
 
   Future<void> _openRoute(BuildContext context) async {
     if (!shop.hasCoordinates) {
@@ -747,7 +812,7 @@ class _ShopHero extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             SizedBox(
-              height: 254,
+              height: 240,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: shop.storefrontItems.length,
@@ -755,6 +820,7 @@ class _ShopHero extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final item = shop.storefrontItems[index];
                   final language = strings.language;
+                  final isFavorite = item.isFavorite;
 
                   return InkWell(
                     onTap: onOpenStorefront == null
@@ -762,40 +828,77 @@ class _ShopHero extends StatelessWidget {
                         : () => onOpenStorefront!(index),
                     borderRadius: BorderRadius.circular(22),
                     child: Container(
-                      width: 164,
-                      padding: const EdgeInsets.all(10),
+                      width: 156,
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceStrong,
+                        color: isFavorite
+                            ? AppColors.primary.withValues(alpha: 0.08)
+                            : AppColors.surfaceStrong,
                         borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(
+                          color: isFavorite
+                              ? AppColors.primary
+                              : AppColors.border,
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
-                            child: ProductImage(
-                              source: item.imagePath,
-                              width: 144,
-                              height: 116,
-                              fit: BoxFit.contain,
-                            ),
+                          Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: ProductImage(
+                                  source: item.imagePath,
+                                  width: 140,
+                                  height: 104,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: IconButton.filledTonal(
+                                  onPressed: onToggleStorefrontFavorite == null
+                                      ? null
+                                      : () =>
+                                            onToggleStorefrontFavorite!(index),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: isFavorite
+                                        ? AppColors.primary.withValues(
+                                            alpha: 0.22,
+                                          )
+                                        : AppColors.surfaceStrong.withValues(
+                                            alpha: 0.92,
+                                          ),
+                                    foregroundColor: isFavorite
+                                        ? AppColors.primary
+                                        : AppColors.textMuted,
+                                  ),
+                                  icon: Icon(
+                                    isFavorite
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 8),
                           _StorefrontMetaLine(
                             label: strings.t('priceLabel'),
                             value: item.amount.isEmpty
                                 ? strings.t('notSpecified')
                                 : item.amount,
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           _StorefrontMetaLine(
                             label: strings.t('colorLabel'),
                             value: item.color.isEmpty
                                 ? strings.t('notSpecified')
                                 : localizeColorValue(language, item.color),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           _StorefrontMetaLine(
                             label: strings.t('materialLabel'),
                             value: item.material.isEmpty
@@ -805,7 +908,7 @@ class _ShopHero extends StatelessWidget {
                                     item.material,
                                   ),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           _StorefrontMetaLine(
                             label: strings.t('sizeLabel'),
                             value: item.size.isEmpty
@@ -930,14 +1033,12 @@ class _ShopProductCard extends StatelessWidget {
     required this.product,
     required this.onEdit,
     required this.onDelete,
-    required this.onToggleFavorite,
     required this.onOpenImage,
   });
 
   final Product product;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
-  final VoidCallback onToggleFavorite;
   final ValueChanged<int> onOpenImage;
 
   @override
@@ -945,44 +1046,20 @@ class _ShopProductCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final strings = AppStrings.of(context);
     final language = strings.language;
-    final isFavorite = product.isFavorite;
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: isFavorite
-            ? AppColors.primary.withValues(alpha: 0.08)
-            : AppColors.surface,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(32),
-        border: Border.all(
-          color: isFavorite ? AppColors.primary : AppColors.border,
-        ),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                formatProductDate(product.createdAt),
-                style: textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textMuted,
-                ),
-              ),
-              const Spacer(),
-              IconButton.filledTonal(
-                onPressed: onToggleFavorite,
-                style: IconButton.styleFrom(
-                  backgroundColor: isFavorite
-                      ? AppColors.primary.withValues(alpha: 0.2)
-                      : AppColors.surfaceStrong,
-                  foregroundColor: isFavorite
-                      ? AppColors.primary
-                      : AppColors.textMuted,
-                ),
-                icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
-              ),
-            ],
+          Text(
+            formatProductDate(product.createdAt),
+            style: textTheme.bodyMedium?.copyWith(color: AppColors.textMuted),
           ),
           const SizedBox(height: 14),
           _InlineTotalCard(product: product),

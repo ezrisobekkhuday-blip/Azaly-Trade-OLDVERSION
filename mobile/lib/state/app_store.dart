@@ -48,6 +48,31 @@ class AppStore extends ChangeNotifier {
   List<Product> get allProducts => List.unmodifiable(_products);
   List<Product> get favoriteProducts =>
       List.unmodifiable(_products.where((product) => product.isFavorite));
+  List<FavoriteStorefrontEntry> get favoriteStorefrontItems {
+    final entries = <FavoriteStorefrontEntry>[];
+
+    for (final shop in shops) {
+      for (var index = 0; index < shop.storefrontItems.length; index += 1) {
+        final item = shop.storefrontItems[index];
+        if (!item.isFavorite) {
+          continue;
+        }
+
+        entries.add(
+          FavoriteStorefrontEntry(
+            shopId: shop.id,
+            shopName: shop.name,
+            shopLocation: shop.location,
+            createdAt: shop.createdAt,
+            storefrontIndex: index,
+            item: item,
+          ),
+        );
+      }
+    }
+
+    return List.unmodifiable(entries);
+  }
 
   bool isShopPinned(String shopId) => _pinnedShopIds.contains(shopId);
 
@@ -174,9 +199,10 @@ class AppStore extends ChangeNotifier {
           : serverShop.location,
       latitude: serverShop.latitude ?? latitude,
       longitude: serverShop.longitude ?? longitude,
-      storefrontItems: serverShop.storefrontItems.isEmpty
-          ? preparedStorefrontItems
-          : serverShop.storefrontItems,
+      storefrontItems: _mergeStorefrontItems(
+        preparedStorefrontItems,
+        serverShop.storefrontItems,
+      ),
       businessCardImage: serverShop.businessCardImage.isEmpty
           ? businessCard
           : serverShop.businessCardImage,
@@ -208,9 +234,10 @@ class AppStore extends ChangeNotifier {
       location: serverShop.location.isEmpty
           ? preparedShop.location
           : serverShop.location,
-      storefrontItems: serverShop.storefrontItems.isEmpty
-          ? preparedShop.storefrontItems
-          : serverShop.storefrontItems,
+      storefrontItems: _mergeStorefrontItems(
+        preparedShop.storefrontItems,
+        serverShop.storefrontItems,
+      ),
       businessCardImage: serverShop.businessCardImage.isEmpty
           ? preparedShop.businessCardImage
           : serverShop.businessCardImage,
@@ -311,6 +338,46 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> toggleStorefrontFavorite(
+    String shopId,
+    int storefrontIndex,
+  ) async {
+    final shopIndex = _shops.indexWhere((shop) => shop.id == shopId);
+
+    if (shopIndex == -1) {
+      return;
+    }
+
+    final shop = _shops[shopIndex];
+    if (storefrontIndex < 0 || storefrontIndex >= shop.storefrontItems.length) {
+      return;
+    }
+
+    final updatedItems = List<StorefrontItem>.from(shop.storefrontItems);
+    final item = updatedItems[storefrontIndex];
+    updatedItems[storefrontIndex] = item.copyWith(isFavorite: !item.isFavorite);
+
+    await updateShop(shop.copyWith(storefrontItems: updatedItems));
+  }
+
+  Future<void> removeStorefrontItem(String shopId, int storefrontIndex) async {
+    final shopIndex = _shops.indexWhere((shop) => shop.id == shopId);
+
+    if (shopIndex == -1) {
+      return;
+    }
+
+    final shop = _shops[shopIndex];
+    if (storefrontIndex < 0 || storefrontIndex >= shop.storefrontItems.length) {
+      return;
+    }
+
+    final updatedItems = List<StorefrontItem>.from(shop.storefrontItems)
+      ..removeAt(storefrontIndex);
+
+    await updateShop(shop.copyWith(storefrontItems: updatedItems));
+  }
+
   Future<String> _prepareSingleImage(String imagePath) async {
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
       return imagePath;
@@ -363,6 +430,41 @@ class AppStore extends ChangeNotifier {
     );
   }
 
+  List<StorefrontItem> _mergeStorefrontItems(
+    List<StorefrontItem> localItems,
+    List<StorefrontItem> serverItems,
+  ) {
+    if (serverItems.isEmpty) {
+      return localItems;
+    }
+
+    return List<StorefrontItem>.generate(serverItems.length, (index) {
+      final serverItem = serverItems[index];
+      final localItem = index < localItems.length ? localItems[index] : null;
+
+      if (localItem == null) {
+        return serverItem;
+      }
+
+      return serverItem.copyWith(
+        imagePath: serverItem.imagePath.trim().isEmpty
+            ? localItem.imagePath
+            : serverItem.imagePath,
+        amount: serverItem.amount.trim().isEmpty
+            ? localItem.amount
+            : serverItem.amount,
+        color: serverItem.color.trim().isEmpty
+            ? localItem.color
+            : serverItem.color,
+        material: serverItem.material.trim().isEmpty
+            ? localItem.material
+            : serverItem.material,
+        size: serverItem.size.trim().isEmpty ? localItem.size : serverItem.size,
+        isFavorite: localItem.isFavorite,
+      );
+    }, growable: false);
+  }
+
   void _syncShopCounts() {
     final counts = <String, int>{};
 
@@ -408,4 +510,22 @@ class ShopPurchaseSummary {
   final int totalQuantity;
   final double grossTotal;
   final double netTotal;
+}
+
+class FavoriteStorefrontEntry {
+  const FavoriteStorefrontEntry({
+    required this.shopId,
+    required this.shopName,
+    required this.shopLocation,
+    required this.createdAt,
+    required this.storefrontIndex,
+    required this.item,
+  });
+
+  final String shopId;
+  final String shopName;
+  final String shopLocation;
+  final DateTime createdAt;
+  final int storefrontIndex;
+  final StorefrontItem item;
 }

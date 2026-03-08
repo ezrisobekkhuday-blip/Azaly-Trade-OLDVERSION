@@ -5,6 +5,7 @@ class StorefrontItem {
     this.color = '',
     this.material = '',
     this.size = '',
+    this.isFavorite = false,
   });
 
   final String imagePath;
@@ -12,6 +13,7 @@ class StorefrontItem {
   final String color;
   final String material;
   final String size;
+  final bool isFavorite;
 
   bool get hasDetails =>
       amount.trim().isNotEmpty ||
@@ -25,6 +27,7 @@ class StorefrontItem {
     String? color,
     String? material,
     String? size,
+    bool? isFavorite,
   }) {
     return StorefrontItem(
       imagePath: imagePath ?? this.imagePath,
@@ -32,6 +35,7 @@ class StorefrontItem {
       color: color ?? this.color,
       material: material ?? this.material,
       size: size ?? this.size,
+      isFavorite: isFavorite ?? this.isFavorite,
     );
   }
 
@@ -42,6 +46,7 @@ class StorefrontItem {
       'color': color,
       'material': material,
       'size': size,
+      'is_favorite': isFavorite,
     };
   }
 
@@ -56,6 +61,8 @@ class StorefrontItem {
       color: json['color'] as String? ?? '',
       material: json['material'] as String? ?? '',
       size: json['size'] as String? ?? '',
+      isFavorite:
+          json['isFavorite'] as bool? ?? json['is_favorite'] as bool? ?? false,
     );
   }
 }
