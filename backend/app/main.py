@@ -187,20 +187,22 @@ def resolve_storefront_images(payload: ShopCreate | ShopUpdate) -> list[str]:
 
 
 def normalize_storefront_item(
-    payload: StorefrontItemPayload | dict[str, str],
-) -> dict[str, str] | None:
+    payload: StorefrontItemPayload | dict[str, object],
+) -> dict[str, object] | None:
     if isinstance(payload, StorefrontItemPayload):
         raw_image_path = payload.image_path
         amount = payload.amount
         color = payload.color
         material = payload.material
         size = payload.size
+        is_favorite = payload.is_favorite
     else:
         raw_image_path = payload.get("image_path") or payload.get("imagePath") or ""
         amount = payload.get("amount", "")
         color = payload.get("color", "")
         material = payload.get("material", "")
         size = payload.get("size", "")
+        is_favorite = payload.get("is_favorite") or payload.get("isFavorite") or False
 
     image_path = normalize_image_path(str(raw_image_path).strip())
 
@@ -213,11 +215,12 @@ def normalize_storefront_item(
         "color": str(color).strip(),
         "material": str(material).strip(),
         "size": str(size).strip(),
+        "is_favorite": bool(is_favorite),
     }
 
 
-def resolve_storefront_items(payload: ShopCreate | ShopUpdate) -> list[dict[str, str]]:
-    normalized_items: list[dict[str, str]] = []
+def resolve_storefront_items(payload: ShopCreate | ShopUpdate) -> list[dict[str, object]]:
+    normalized_items: list[dict[str, object]] = []
     seen: set[str] = set()
 
     for item in payload.storefront_items:
@@ -240,7 +243,7 @@ def resolve_storefront_items(payload: ShopCreate | ShopUpdate) -> list[dict[str,
 
 
 def get_shop_storefront_items(shop: Shop) -> list[dict[str, str]]:
-    normalized_items: list[dict[str, str]] = []
+    normalized_items: list[dict[str, object]] = []
     seen: set[str] = set()
 
     for item in shop.storefront_items or []:

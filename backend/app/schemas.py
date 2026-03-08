@@ -23,6 +23,7 @@ class StorefrontItemPayload(BaseModel):
     color: str = ""
     material: str = ""
     size: str = ""
+    is_favorite: bool = False
 
 
 class ShopCreate(BaseModel):
