@@ -142,7 +142,7 @@ class AppStore extends ChangeNotifier {
   Future<void> createShop({
     required String name,
     required String photoPath,
-    required List<String> storefrontPhotoPaths,
+    required List<StorefrontItem> storefrontItems,
     required String location,
     required double? latitude,
     required double? longitude,
@@ -150,7 +150,9 @@ class AppStore extends ChangeNotifier {
     required String businessCardPath,
   }) async {
     final photo = await _prepareSingleImage(photoPath);
-    final storefrontImages = await _prepareImagePaths(storefrontPhotoPaths);
+    final preparedStorefrontItems = await _prepareStorefrontItems(
+      storefrontItems,
+    );
     final businessCard = businessCardPath.trim().isEmpty
         ? ''
         : await _prepareSingleImage(businessCardPath);
@@ -162,7 +164,7 @@ class AppStore extends ChangeNotifier {
       latitude: latitude,
       longitude: longitude,
       description: description.trim(),
-      storefrontImages: storefrontImages,
+      storefrontItems: preparedStorefrontItems,
       businessCardImage: businessCard,
     );
     final createdShop = serverShop.copyWith(
@@ -172,9 +174,9 @@ class AppStore extends ChangeNotifier {
           : serverShop.location,
       latitude: serverShop.latitude ?? latitude,
       longitude: serverShop.longitude ?? longitude,
-      storefrontImages: serverShop.storefrontImages.isEmpty
-          ? storefrontImages
-          : serverShop.storefrontImages,
+      storefrontItems: serverShop.storefrontItems.isEmpty
+          ? preparedStorefrontItems
+          : serverShop.storefrontItems,
       businessCardImage: serverShop.businessCardImage.isEmpty
           ? businessCard
           : serverShop.businessCardImage,
@@ -192,19 +194,25 @@ class AppStore extends ChangeNotifier {
       return;
     }
 
-    final serverShop = await _apiClient.updateShop(updatedShop);
+    final preparedStorefrontItems = await _prepareStorefrontItems(
+      updatedShop.storefrontItems,
+    );
+    final preparedShop = updatedShop.copyWith(
+      storefrontItems: preparedStorefrontItems,
+    );
+    final serverShop = await _apiClient.updateShop(preparedShop);
     _shops[index] = serverShop.copyWith(
-      photo: serverShop.photo.isEmpty ? updatedShop.photo : serverShop.photo,
-      latitude: serverShop.latitude ?? updatedShop.latitude,
-      longitude: serverShop.longitude ?? updatedShop.longitude,
+      photo: serverShop.photo.isEmpty ? preparedShop.photo : serverShop.photo,
+      latitude: serverShop.latitude ?? preparedShop.latitude,
+      longitude: serverShop.longitude ?? preparedShop.longitude,
       location: serverShop.location.isEmpty
-          ? updatedShop.location
+          ? preparedShop.location
           : serverShop.location,
-      storefrontImages: serverShop.storefrontImages.isEmpty
-          ? updatedShop.storefrontImages
-          : serverShop.storefrontImages,
+      storefrontItems: serverShop.storefrontItems.isEmpty
+          ? preparedShop.storefrontItems
+          : serverShop.storefrontItems,
       businessCardImage: serverShop.businessCardImage.isEmpty
-          ? updatedShop.businessCardImage
+          ? preparedShop.businessCardImage
           : serverShop.businessCardImage,
     );
     notifyListeners();
@@ -335,6 +343,24 @@ class AppStore extends ChangeNotifier {
       uploadedIndex += 1;
       return remotePath;
     }).toList();
+  }
+
+  Future<List<StorefrontItem>> _prepareStorefrontItems(
+    List<StorefrontItem> items,
+  ) async {
+    if (items.isEmpty) {
+      return const [];
+    }
+
+    final uploadedImagePaths = await _prepareImagePaths(
+      items.map((item) => item.imagePath).toList(),
+    );
+
+    return List<StorefrontItem>.generate(
+      items.length,
+      (index) => items[index].copyWith(imagePath: uploadedImagePaths[index]),
+      growable: false,
+    );
   }
 
   void _syncShopCounts() {

@@ -178,6 +178,12 @@ class AppStrings {
       'en': 'Take photos of the entrance, signboard, or storefront.',
       'zh': '拍摄店铺入口、招牌或橱窗。',
     },
+    'storefrontMetaHint': {
+      'ru': 'Цена, цвет, материал, размер',
+      'en': 'Price, color, material, size',
+      'zh': '价格、颜色、材质、尺码',
+    },
+    'fillDetails': {'ru': 'Заполнить', 'en': 'Fill in', 'zh': '填写'},
     'shopNameLabel': {
       'ru': 'Название магазина',
       'en': 'Shop name',

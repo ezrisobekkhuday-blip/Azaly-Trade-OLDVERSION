@@ -594,7 +594,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                             strings.t('shopPhoto'),
                             shop.photo,
                           ),
-                    onOpenStorefront: shop.storefrontImages.isEmpty
+                    onOpenStorefront: shop.storefrontItems.isEmpty
                         ? null
                         : (index) => _openImageGallery(
                             strings.t('storefrontPhotos'),
@@ -737,7 +737,7 @@ class _ShopHero extends StatelessWidget {
               ),
             ),
           ],
-          if (shop.storefrontImages.isNotEmpty) ...[
+          if (shop.storefrontItems.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(
               strings.t('storefrontPhotos'),
@@ -747,36 +747,76 @@ class _ShopHero extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             SizedBox(
-              height: 156,
+              height: 254,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: shop.storefrontImages.length,
+                itemCount: shop.storefrontItems.length,
                 separatorBuilder: (_, index) => const SizedBox(width: 12),
-                itemBuilder: (context, index) => InkWell(
-                  onTap: onOpenStorefront == null
-                      ? null
-                      : () => onOpenStorefront!(index),
-                  borderRadius: BorderRadius.circular(22),
-                  child: Container(
-                    width: 116,
-                    height: 156,
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceStrong,
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: ProductImage(
-                        source: shop.storefrontImages[index],
-                        width: 100,
-                        height: 140,
-                        fit: BoxFit.contain,
+                itemBuilder: (context, index) {
+                  final item = shop.storefrontItems[index];
+                  final language = strings.language;
+
+                  return InkWell(
+                    onTap: onOpenStorefront == null
+                        ? null
+                        : () => onOpenStorefront!(index),
+                    borderRadius: BorderRadius.circular(22),
+                    child: Container(
+                      width: 164,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceStrong,
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: ProductImage(
+                              source: item.imagePath,
+                              width: 144,
+                              height: 116,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          _StorefrontMetaLine(
+                            label: strings.t('priceLabel'),
+                            value: item.amount.isEmpty
+                                ? strings.t('notSpecified')
+                                : item.amount,
+                          ),
+                          const SizedBox(height: 6),
+                          _StorefrontMetaLine(
+                            label: strings.t('colorLabel'),
+                            value: item.color.isEmpty
+                                ? strings.t('notSpecified')
+                                : localizeColorValue(language, item.color),
+                          ),
+                          const SizedBox(height: 6),
+                          _StorefrontMetaLine(
+                            label: strings.t('materialLabel'),
+                            value: item.material.isEmpty
+                                ? strings.t('notSpecified')
+                                : localizeMaterialValue(
+                                    language,
+                                    item.material,
+                                  ),
+                          ),
+                          const SizedBox(height: 6),
+                          _StorefrontMetaLine(
+                            label: strings.t('sizeLabel'),
+                            value: item.size.isEmpty
+                                ? strings.t('notSpecified')
+                                : localizeSizeValue(language, item.size),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           ],
@@ -1228,6 +1268,41 @@ class _MiniInfo extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _StorefrontMetaLine extends StatelessWidget {
+  const _StorefrontMetaLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.labelSmall?.copyWith(color: AppColors.textMuted),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
     );
   }
 }

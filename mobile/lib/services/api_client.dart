@@ -92,9 +92,13 @@ class ApiClient {
     required double? latitude,
     required double? longitude,
     required String description,
-    required List<String> storefrontImages,
+    required List<StorefrontItem> storefrontItems,
     required String businessCardImage,
   }) async {
+    final storefrontImages = storefrontItems
+        .map((item) => item.imagePath)
+        .where((path) => path.trim().isNotEmpty)
+        .toList();
     final response = await _client.post(
       _uri('/shops'),
       headers: _jsonHeaders,
@@ -105,6 +109,9 @@ class ApiClient {
         'latitude': latitude,
         'longitude': longitude,
         'description': description,
+        'storefront_items': storefrontItems
+            .map((item) => item.toJson())
+            .toList(),
         'storefront_images': storefrontImages,
         'storefront_image': storefrontImages.isEmpty
             ? ''
@@ -123,6 +130,10 @@ class ApiClient {
   }
 
   Future<Shop> updateShop(Shop shop) async {
+    final storefrontImages = shop.storefrontItems
+        .map((item) => item.imagePath)
+        .where((path) => path.trim().isNotEmpty)
+        .toList();
     final response = await _client.put(
       _uri('/shops/${shop.id}'),
       headers: _jsonHeaders,
@@ -133,8 +144,13 @@ class ApiClient {
         'latitude': shop.latitude,
         'longitude': shop.longitude,
         'description': shop.description,
+        'storefront_items': shop.storefrontItems
+            .map((item) => item.toJson())
+            .toList(),
         'storefront_images': shop.storefrontImages,
-        'storefront_image': shop.storefrontPreview,
+        'storefront_image': storefrontImages.isEmpty
+            ? ''
+            : storefrontImages.first,
         'business_card_image': shop.businessCardImage,
       }),
     );

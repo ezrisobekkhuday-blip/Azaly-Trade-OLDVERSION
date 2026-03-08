@@ -1,3 +1,65 @@
+class StorefrontItem {
+  const StorefrontItem({
+    required this.imagePath,
+    this.amount = '',
+    this.color = '',
+    this.material = '',
+    this.size = '',
+  });
+
+  final String imagePath;
+  final String amount;
+  final String color;
+  final String material;
+  final String size;
+
+  bool get hasDetails =>
+      amount.trim().isNotEmpty ||
+      color.trim().isNotEmpty ||
+      material.trim().isNotEmpty ||
+      size.trim().isNotEmpty;
+
+  StorefrontItem copyWith({
+    String? imagePath,
+    String? amount,
+    String? color,
+    String? material,
+    String? size,
+  }) {
+    return StorefrontItem(
+      imagePath: imagePath ?? this.imagePath,
+      amount: amount ?? this.amount,
+      color: color ?? this.color,
+      material: material ?? this.material,
+      size: size ?? this.size,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'image_path': imagePath,
+      'amount': amount,
+      'color': color,
+      'material': material,
+      'size': size,
+    };
+  }
+
+  factory StorefrontItem.fromJson(Map<String, dynamic> json) {
+    return StorefrontItem(
+      imagePath:
+          json['imagePath'] as String? ??
+          json['image_path'] as String? ??
+          json['photo'] as String? ??
+          '',
+      amount: json['amount'] as String? ?? '',
+      color: json['color'] as String? ?? '',
+      material: json['material'] as String? ?? '',
+      size: json['size'] as String? ?? '',
+    );
+  }
+}
+
 class Shop {
   const Shop({
     required this.id,
@@ -7,7 +69,7 @@ class Shop {
     required this.latitude,
     required this.longitude,
     required this.description,
-    required this.storefrontImages,
+    required this.storefrontItems,
     required this.businessCardImage,
     required this.productsCount,
     required this.createdAt,
@@ -20,13 +82,17 @@ class Shop {
   final double? latitude;
   final double? longitude;
   final String description;
-  final List<String> storefrontImages;
+  final List<StorefrontItem> storefrontItems;
   final String businessCardImage;
   final int productsCount;
   final DateTime createdAt;
 
   bool get hasCoordinates => latitude != null && longitude != null;
-  bool get hasStorefrontImages => storefrontImages.isNotEmpty;
+  bool get hasStorefrontImages => storefrontItems.isNotEmpty;
+  List<String> get storefrontImages => storefrontItems
+      .map((item) => item.imagePath.trim())
+      .where((path) => path.isNotEmpty)
+      .toList(growable: false);
   String get storefrontPreview =>
       hasStorefrontImages ? storefrontImages.first : '';
 
@@ -37,7 +103,7 @@ class Shop {
     double? latitude,
     double? longitude,
     String? description,
-    List<String>? storefrontImages,
+    List<StorefrontItem>? storefrontItems,
     String? businessCardImage,
     int? productsCount,
   }) {
@@ -49,8 +115,8 @@ class Shop {
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       description: description ?? this.description,
-      storefrontImages: List<String>.unmodifiable(
-        storefrontImages ?? this.storefrontImages,
+      storefrontItems: List<StorefrontItem>.unmodifiable(
+        storefrontItems ?? this.storefrontItems,
       ),
       businessCardImage: businessCardImage ?? this.businessCardImage,
       productsCount: productsCount ?? this.productsCount,
@@ -60,9 +126,21 @@ class Shop {
 
   factory Shop.fromJson(Map<String, dynamic> json) {
     final rawCreatedAt = json['createdAt'] ?? json['created_at'];
+    final rawStorefrontItems =
+        json['storefrontItems'] ?? json['storefront_items'];
     final rawStorefrontImages =
         json['storefrontImages'] ?? json['storefront_images'];
-    final storefrontImages = rawStorefrontImages is List
+    final storefrontItems = rawStorefrontItems is List
+        ? rawStorefrontItems
+              .whereType<Map>()
+              .map(
+                (item) =>
+                    StorefrontItem.fromJson(Map<String, dynamic>.from(item)),
+              )
+              .where((item) => item.imagePath.trim().isNotEmpty)
+              .toList()
+        : <StorefrontItem>[];
+    final legacyStorefrontImages = rawStorefrontImages is List
         ? rawStorefrontImages
               .map((item) => item.toString().trim())
               .where((item) => item.isNotEmpty)
@@ -73,8 +151,14 @@ class Shop {
         json['storefront_image'] as String? ??
         '';
 
-    if (storefrontImages.isEmpty && legacyStorefront.trim().isNotEmpty) {
-      storefrontImages.add(legacyStorefront.trim());
+    if (storefrontItems.isEmpty) {
+      for (final image in legacyStorefrontImages) {
+        storefrontItems.add(StorefrontItem(imagePath: image));
+      }
+    }
+
+    if (storefrontItems.isEmpty && legacyStorefront.trim().isNotEmpty) {
+      storefrontItems.add(StorefrontItem(imagePath: legacyStorefront.trim()));
     }
 
     return Shop(
@@ -85,7 +169,7 @@ class Shop {
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       description: json['description'] as String? ?? '',
-      storefrontImages: List<String>.unmodifiable(storefrontImages),
+      storefrontItems: List<StorefrontItem>.unmodifiable(storefrontItems),
       businessCardImage:
           json['businessCardImage'] as String? ??
           json['business_card_image'] as String? ??

@@ -5,14 +5,18 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../data/product_presets.dart';
 import '../localization/app_strings.dart';
 import '../models/map_selection_result.dart';
+import '../models/shop.dart';
 import '../services/api_client.dart';
 import '../state/app_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/product_image.dart';
+import '../widgets/product_thumbnail_card.dart';
 import '../widgets/shop_map_preview.dart';
+import '../widgets/suggestion_field.dart';
 import 'location_picker_page.dart';
 
 const double _pickedImageMaxDimension = 1440;
@@ -39,7 +43,7 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
   final TextEditingController _descriptionController = TextEditingController();
 
   String _shopPhotoPath = '';
-  final List<String> _storefrontPhotoPaths = [];
+  final List<StorefrontItem> _storefrontItems = [];
   String _businessCardPath = '';
   double? _selectedLatitude;
   double? _selectedLongitude;
@@ -109,7 +113,9 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
       }
 
       setState(() {
-        _storefrontPhotoPaths.addAll(files.map((file) => file.path));
+        _storefrontItems.addAll(
+          files.map((file) => StorefrontItem(imagePath: file.path)),
+        );
       });
     } catch (_) {
       _showMessage(AppStrings.of(context).t('cannotLoadStorefront'));
@@ -130,11 +136,29 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
       }
 
       setState(() {
-        _storefrontPhotoPaths.add(file.path);
+        _storefrontItems.add(StorefrontItem(imagePath: file.path));
       });
     } catch (_) {
       _showMessage(AppStrings.of(context).t('cannotOpenStorefrontCamera'));
     }
+  }
+
+  Future<void> _editStorefrontItem(int index) async {
+    final updatedItem = await showModalBottomSheet<StorefrontItem>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _StorefrontItemEditorSheet(item: _storefrontItems[index]),
+    );
+
+    if (updatedItem == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _storefrontItems[index] = updatedItem;
+    });
   }
 
   Future<void> _createShop() async {
@@ -151,7 +175,7 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
       await widget.store.createShop(
         name: _nameController.text,
         photoPath: _shopPhotoPath,
-        storefrontPhotoPaths: _storefrontPhotoPaths,
+        storefrontItems: _storefrontItems,
         location: _locationController.text,
         latitude: _selectedLatitude,
         longitude: _selectedLongitude,
@@ -169,7 +193,7 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
 
       setState(() {
         _shopPhotoPath = '';
-        _storefrontPhotoPaths.clear();
+        _storefrontItems.clear();
         _businessCardPath = '';
         _selectedLatitude = null;
         _selectedLongitude = null;
@@ -405,22 +429,22 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
                         : () => setState(() => _shopPhotoPath = ''),
                   ),
                   const SizedBox(height: 14),
-                  _ImagePickerCard(
+                  _StorefrontItemsCard(
                     title: strings.t('storefrontPhotos'),
                     helperText: strings.t('storefrontHelper'),
-                    imagePaths: _storefrontPhotoPaths,
+                    items: _storefrontItems,
                     onGallery: _isSubmitting
                         ? null
                         : _pickStorefrontFromGallery,
                     onCamera: _isSubmitting ? null : _pickStorefrontFromCamera,
-                    onClearAll: _storefrontPhotoPaths.isEmpty || _isSubmitting
+                    onClearAll: _storefrontItems.isEmpty || _isSubmitting
                         ? null
-                        : () => setState(_storefrontPhotoPaths.clear),
+                        : () => setState(_storefrontItems.clear),
+                    onEditAt: _isSubmitting ? null : _editStorefrontItem,
                     onRemoveAt: _isSubmitting
                         ? null
-                        : (index) => setState(
-                            () => _storefrontPhotoPaths.removeAt(index),
-                          ),
+                        : (index) =>
+                              setState(() => _storefrontItems.removeAt(index)),
                   ),
                   const SizedBox(height: 14),
                   TextField(
@@ -778,40 +802,31 @@ class _SurfaceCard extends StatelessWidget {
   }
 }
 
-class _ImagePickerCard extends StatelessWidget {
-  const _ImagePickerCard({
+class _StorefrontItemsCard extends StatelessWidget {
+  const _StorefrontItemsCard({
     required this.title,
-    this.imagePath = '',
-    this.imagePaths = const [],
-    this.helperText,
+    required this.helperText,
+    required this.items,
     required this.onGallery,
     required this.onCamera,
-    this.onClear,
+    required this.onEditAt,
+    required this.onRemoveAt,
     this.onClearAll,
-    this.onRemoveAt,
   });
 
   final String title;
-  final String imagePath;
-  final List<String> imagePaths;
-  final String? helperText;
+  final String helperText;
+  final List<StorefrontItem> items;
   final VoidCallback? onGallery;
   final VoidCallback? onCamera;
-  final VoidCallback? onClear;
-  final VoidCallback? onClearAll;
+  final ValueChanged<int>? onEditAt;
   final ValueChanged<int>? onRemoveAt;
+  final VoidCallback? onClearAll;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final strings = AppStrings.of(context);
-    final previewImages = imagePaths.isNotEmpty
-        ? imagePaths
-        : imagePath.isEmpty
-        ? const <String>[]
-        : [imagePath];
-    final hasMultipleImages = imagePaths.isNotEmpty;
-    final clearAction = hasMultipleImages ? onClearAll : onClear;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -833,9 +848,9 @@ class _ImagePickerCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (previewImages.isNotEmpty)
+              if (items.isNotEmpty)
                 IconButton.filledTonal(
-                  onPressed: clearAction,
+                  onPressed: onClearAll,
                   icon: const Icon(Icons.close),
                 ),
             ],
@@ -861,64 +876,437 @@ class _ImagePickerCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          if (previewImages.isEmpty)
+          if (items.isEmpty)
             Text(
-              helperText ?? strings.t('chooseOrTakePhoto'),
+              helperText,
               style: textTheme.bodyMedium?.copyWith(
                 color: AppColors.textSecondary,
               ),
             )
-          else if (hasMultipleImages)
+          else
             SizedBox(
-              height: 148,
+              height: 238,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: previewImages.length,
+                itemCount: items.length,
                 separatorBuilder: (_, index) => const SizedBox(width: 12),
-                itemBuilder: (context, index) {
-                  final source = previewImages[index];
+                itemBuilder: (context, index) => _StorefrontItemSummaryCard(
+                  item: items[index],
+                  onEdit: onEditAt == null ? null : () => onEditAt!(index),
+                  onRemove: onRemoveAt == null
+                      ? null
+                      : () => onRemoveAt!(index),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
 
-                  return Stack(
-                    children: [
-                      Container(
-                        width: 112,
-                        height: 148,
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceStrong,
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: ProductImage(
-                            source: source,
-                            width: 96,
-                            height: 132,
-                            fit: BoxFit.contain,
-                          ),
+class _StorefrontItemSummaryCard extends StatelessWidget {
+  const _StorefrontItemSummaryCard({
+    required this.item,
+    this.onEdit,
+    this.onRemove,
+  });
+
+  final StorefrontItem item;
+  final VoidCallback? onEdit;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
+    final chips = <Widget>[
+      if (item.amount.trim().isNotEmpty)
+        _StorefrontOverlayChip(
+          icon: Icons.payments_outlined,
+          label: item.amount.trim(),
+        ),
+      if (item.color.trim().isNotEmpty)
+        _StorefrontOverlayChip(
+          icon: Icons.palette_outlined,
+          label: item.color.trim(),
+        ),
+      if (item.material.trim().isNotEmpty)
+        _StorefrontOverlayChip(
+          icon: Icons.checkroom_outlined,
+          label: item.material.trim(),
+        ),
+      if (item.size.trim().isNotEmpty)
+        _StorefrontOverlayChip(
+          icon: Icons.straighten_outlined,
+          label: item.size.trim(),
+        ),
+    ];
+
+    return InkWell(
+      onTap: onEdit,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        width: 152,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF111A2D), Color(0xFF0C1323)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: ProductThumbnailCard(
+                source: item.imagePath,
+                width: 112,
+                height: 148,
+                onTap: onEdit,
+                onRemove: onRemove,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (chips.isEmpty)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _StorefrontOverlayChip(
+                  icon: Icons.edit_outlined,
+                  label: strings.t('fillDetails'),
+                  highlighted: true,
+                ),
+              )
+            else
+              Wrap(spacing: 6, runSpacing: 6, children: chips),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StorefrontOverlayChip extends StatelessWidget {
+  const _StorefrontOverlayChip({
+    required this.icon,
+    required this.label,
+    this.highlighted = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: highlighted
+            ? AppColors.primary.withValues(alpha: 0.88)
+            : const Color(0xB311182B),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: highlighted
+              ? AppColors.primary.withValues(alpha: 0.55)
+              : AppColors.border,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 12,
+            color: highlighted ? const Color(0xFF08110F) : AppColors.textMuted,
+          ),
+          const SizedBox(width: 5),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 104),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: highlighted
+                    ? const Color(0xFF08110F)
+                    : AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StorefrontItemEditorSheet extends StatefulWidget {
+  const _StorefrontItemEditorSheet({required this.item});
+
+  final StorefrontItem item;
+
+  @override
+  State<_StorefrontItemEditorSheet> createState() =>
+      _StorefrontItemEditorSheetState();
+}
+
+class _StorefrontItemEditorSheetState
+    extends State<_StorefrontItemEditorSheet> {
+  late final TextEditingController _amountController;
+  late final TextEditingController _colorController;
+  late final TextEditingController _materialController;
+  late final TextEditingController _sizeController;
+
+  @override
+  void initState() {
+    super.initState();
+    _amountController = TextEditingController(text: widget.item.amount);
+    _colorController = TextEditingController(text: widget.item.color);
+    _materialController = TextEditingController(text: widget.item.material);
+    _sizeController = TextEditingController(text: widget.item.size);
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _colorController.dispose();
+    _materialController.dispose();
+    _sizeController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    Navigator.of(context).pop(
+      widget.item.copyWith(
+        amount: _amountController.text.trim(),
+        color: _colorController.text.trim(),
+        material: _materialController.text.trim(),
+        size: _sizeController.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset + 16),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppColors.background, AppColors.backgroundSecondary],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        strings.t('storefrontPhotos'),
+                        style: textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      if (onRemoveAt != null)
-                        Positioned(
-                          right: 8,
-                          top: 8,
-                          child: IconButton.filledTonal(
-                            onPressed: () => onRemoveAt!(index),
-                            icon: const Icon(Icons.close, size: 16),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ),
-                    ],
-                  );
-                },
+                    ),
+                    IconButton.filledTonal(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: ProductImage(
+                    source: widget.item.imagePath,
+                    width: double.infinity,
+                    height: 190,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _amountController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: strings.t('purchasePriceLabel'),
+                    hintText: strings.t('purchasePriceHint'),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SuggestionField(
+                  controller: _colorController,
+                  label: strings.t('colorLabel'),
+                  hint: strings.t('colorHint'),
+                  suggestions: localizedColorSuggestions(strings.language),
+                  quickGroups: [
+                    SuggestionGroup(
+                      label: strings.t('popularColors'),
+                      items: localizedPopularColorSuggestions(strings.language),
+                    ),
+                  ],
+                  allowMultiSelect: true,
+                ),
+                const SizedBox(height: 14),
+                SuggestionField(
+                  controller: _materialController,
+                  label: strings.t('materialLabel'),
+                  hint: strings.t('materialHint'),
+                  suggestions: localizedMaterialSuggestions(strings.language),
+                  quickGroups: [
+                    SuggestionGroup(
+                      label: strings.t('popular'),
+                      items: localizedPopularMaterialSuggestions(
+                        strings.language,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                SuggestionField(
+                  controller: _sizeController,
+                  label: strings.t('sizeLabel'),
+                  hint: strings.t('sizeHint'),
+                  suggestions: localizedSizeSuggestions(strings.language),
+                  quickGroups: [
+                    SuggestionGroup(
+                      label: strings.t('alphaSizes'),
+                      items: alphaSizeSuggestions,
+                    ),
+                    SuggestionGroup(
+                      label: strings.t('numericSizes'),
+                      items: numericSizeSuggestions,
+                    ),
+                    SuggestionGroup(
+                      label: strings.t('specialSizes'),
+                      items: localizedSpecialSizeSuggestions(strings.language),
+                    ),
+                  ],
+                  allowMultiSelect: true,
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: const Color(0xFF04120F),
+                      minimumSize: const Size.fromHeight(56),
+                    ),
+                    onPressed: _save,
+                    child: Text(strings.t('save')),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ImagePickerCard extends StatelessWidget {
+  const _ImagePickerCard({
+    required this.title,
+    this.imagePath = '',
+    required this.onGallery,
+    required this.onCamera,
+    this.onClear,
+  });
+
+  final String title;
+  final String imagePath;
+  final VoidCallback? onGallery;
+  final VoidCallback? onCamera;
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final strings = AppStrings.of(context);
+    final hasImage = imagePath.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (hasImage)
+                IconButton.filledTonal(
+                  onPressed: onClear,
+                  icon: const Icon(Icons.close),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  onPressed: onGallery,
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: Text(strings.t('gallery')),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  onPressed: onCamera,
+                  icon: const Icon(Icons.photo_camera_outlined),
+                  label: Text(strings.t('camera')),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (!hasImage)
+            Text(
+              strings.t('chooseOrTakePhoto'),
+              style: textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
               ),
             )
           else
             ClipRRect(
               borderRadius: BorderRadius.circular(22),
               child: ProductImage(
-                source: previewImages.first,
+                source: imagePath,
                 width: double.infinity,
                 height: 180,
                 fit: BoxFit.cover,
