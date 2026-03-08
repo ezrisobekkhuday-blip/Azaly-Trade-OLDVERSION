@@ -10,21 +10,46 @@ class AppStore extends ChangeNotifier {
   AppStore({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
 
   static const String _languageStorageKey = 'app_language';
+  static const String _pinnedShopsStorageKey = 'pinned_shops';
 
   final ApiClient _apiClient;
   bool _isReady = false;
   String _displayName = 'Azaly Trade';
   AppLanguage _language = AppLanguage.ru;
+  final List<String> _pinnedShopIds = [];
   final List<Shop> _shops = [];
   final List<Product> _products = [];
 
   bool get isReady => _isReady;
   String get displayName => _displayName;
   AppLanguage get language => _language;
-  List<Shop> get shops => List.unmodifiable(_shops);
+  List<Shop> get shops {
+    final orderedShops = List<Shop>.from(_shops);
+    orderedShops.sort((left, right) {
+      final leftPinnedIndex = _pinnedShopIds.indexOf(left.id);
+      final rightPinnedIndex = _pinnedShopIds.indexOf(right.id);
+      final leftPinned = leftPinnedIndex != -1;
+      final rightPinned = rightPinnedIndex != -1;
+
+      if (leftPinned && rightPinned) {
+        return leftPinnedIndex.compareTo(rightPinnedIndex);
+      }
+
+      if (leftPinned != rightPinned) {
+        return leftPinned ? -1 : 1;
+      }
+
+      return right.createdAt.compareTo(left.createdAt);
+    });
+
+    return List.unmodifiable(orderedShops);
+  }
+
   List<Product> get allProducts => List.unmodifiable(_products);
   List<Product> get favoriteProducts =>
       List.unmodifiable(_products.where((product) => product.isFavorite));
+
+  bool isShopPinned(String shopId) => _pinnedShopIds.contains(shopId);
 
   Shop? shopById(String shopId) {
     for (final shop in _shops) {
@@ -69,6 +94,9 @@ class AppStore extends ChangeNotifier {
     _language = AppLanguage.fromCode(
       preferences.getString(_languageStorageKey) ?? AppLanguage.ru.code,
     );
+    _pinnedShopIds
+      ..clear()
+      ..addAll(preferences.getStringList(_pinnedShopsStorageKey) ?? const []);
 
     try {
       final bootstrap = await _apiClient.fetchBootstrap();
@@ -80,6 +108,7 @@ class AppStore extends ChangeNotifier {
         ..clear()
         ..addAll(bootstrap.products);
       _syncShopCounts();
+      await _cleanupPinnedShops();
     } catch (_) {
       _displayName = 'Azaly Trade';
       _shops.clear();
@@ -185,7 +214,25 @@ class AppStore extends ChangeNotifier {
     await _apiClient.deleteShop(shopId);
     _shops.removeWhere((shop) => shop.id == shopId);
     _products.removeWhere((product) => product.shopId == shopId);
+    _pinnedShopIds.removeWhere((id) => id == shopId);
+    await _persistPinnedShops();
     _syncShopCounts();
+    notifyListeners();
+  }
+
+  Future<void> setShopPinned(String shopId, bool pinned) async {
+    final exists = _shops.any((shop) => shop.id == shopId);
+
+    if (!exists) {
+      return;
+    }
+
+    _pinnedShopIds.removeWhere((id) => id == shopId);
+    if (pinned) {
+      _pinnedShopIds.insert(0, shopId);
+    }
+
+    await _persistPinnedShops();
     notifyListeners();
   }
 
@@ -301,6 +348,21 @@ class AppStore extends ChangeNotifier {
       final shop = _shops[index];
       _shops[index] = shop.copyWith(productsCount: counts[shop.id] ?? 0);
     }
+  }
+
+  Future<void> _cleanupPinnedShops() async {
+    final validIds = _shops.map((shop) => shop.id).toSet();
+    final originalLength = _pinnedShopIds.length;
+    _pinnedShopIds.removeWhere((shopId) => !validIds.contains(shopId));
+
+    if (_pinnedShopIds.length != originalLength) {
+      await _persistPinnedShops();
+    }
+  }
+
+  Future<void> _persistPinnedShops() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setStringList(_pinnedShopsStorageKey, _pinnedShopIds);
   }
 
   @override

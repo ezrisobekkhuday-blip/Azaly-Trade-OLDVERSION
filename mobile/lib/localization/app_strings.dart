@@ -366,12 +366,25 @@ class AppStrings {
       'en': 'Shop deleted.',
       'zh': '店铺已删除。',
     },
+    'shopPinned': {
+      'ru': 'Магазин закреплён вверху.',
+      'en': 'Shop pinned to the top.',
+      'zh': '店铺已固定在顶部。',
+    },
+    'shopUnpinned': {
+      'ru': 'Магазин откреплён.',
+      'en': 'Shop unpinned.',
+      'zh': '店铺已取消固定。',
+    },
     'cannotDeleteShop': {
       'ru': 'Не удалось удалить магазин.',
       'en': 'Failed to delete the shop.',
       'zh': '无法删除店铺。',
     },
+    'pinShop': {'ru': 'Закрепить', 'en': 'Pin', 'zh': '固定'},
+    'unpinShop': {'ru': 'Открепить', 'en': 'Unpin', 'zh': '取消固定'},
     'openShop': {'ru': 'Открыть магазин', 'en': 'Open shop', 'zh': '打开店铺'},
+    'shopPhotoTitle': {'ru': 'Фото магазина', 'en': 'Shop photo', 'zh': '店铺照片'},
     'editShopTitle': {
       'ru': 'Редактировать магазин',
       'en': 'Edit shop',
