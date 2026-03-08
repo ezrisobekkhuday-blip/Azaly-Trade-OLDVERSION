@@ -10,8 +10,11 @@ from sqlalchemy import func, inspect, select, text
 from sqlalchemy.orm import Session
 
 from .database import Base, SessionLocal, engine, get_db
-from .models import Product, Profile, Shop
+from .models import Expense, Product, Profile, Shop
 from .schemas import (
+    ExpenseCreate,
+    ExpenseRead,
+    ExpenseUpdate,
     HealthResponse,
     ProductCreate,
     ProductRead,
@@ -339,6 +342,16 @@ def serialize_product(request: Request, product: Product, shop_name: str = "") -
     )
 
 
+def serialize_expense(expense: Expense) -> ExpenseRead:
+    return ExpenseRead(
+        id=str(expense.id),
+        title=expense.title,
+        amount=expense.amount,
+        note=expense.note,
+        created_at=expense.created_at,
+    )
+
+
 def delete_uploaded_image(image_path: str) -> None:
     normalized_path = normalize_image_path(image_path)
 
@@ -402,7 +415,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Azaly Trade API", version="0.6.0", lifespan=lifespan)
+app = FastAPI(title="Azaly Trade API", version="0.7.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -671,3 +684,53 @@ def delete_product(product_id: int, db: Session = Depends(get_db)) -> None:
 
     for image in product_images:
         delete_uploaded_image(image)
+
+
+@app.get("/expenses", response_model=list[ExpenseRead])
+def list_expenses(db: Session = Depends(get_db)) -> list[ExpenseRead]:
+    expenses = list(db.scalars(select(Expense).order_by(Expense.created_at.desc())).all())
+    return [serialize_expense(expense) for expense in expenses]
+
+
+@app.post("/expenses", response_model=ExpenseRead, status_code=status.HTTP_201_CREATED)
+def create_expense(payload: ExpenseCreate, db: Session = Depends(get_db)) -> ExpenseRead:
+    expense = Expense(
+        title=payload.title.strip(),
+        amount=payload.amount.strip(),
+        note=payload.note.strip(),
+    )
+    db.add(expense)
+    db.commit()
+    db.refresh(expense)
+    return serialize_expense(expense)
+
+
+@app.put("/expenses/{expense_id}", response_model=ExpenseRead)
+def update_expense(
+    expense_id: int,
+    payload: ExpenseUpdate,
+    db: Session = Depends(get_db),
+) -> ExpenseRead:
+    expense = db.get(Expense, expense_id)
+
+    if expense is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found.")
+
+    expense.title = payload.title.strip()
+    expense.amount = payload.amount.strip()
+    expense.note = payload.note.strip()
+
+    db.commit()
+    db.refresh(expense)
+    return serialize_expense(expense)
+
+
+@app.delete("/expenses/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_expense(expense_id: int, db: Session = Depends(get_db)) -> None:
+    expense = db.get(Expense, expense_id)
+
+    if expense is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found.")
+
+    db.delete(expense)
+    db.commit()

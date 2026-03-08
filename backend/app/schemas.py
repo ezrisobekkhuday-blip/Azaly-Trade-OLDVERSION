@@ -103,3 +103,23 @@ class ProductRead(BaseModel):
     status: str
     is_favorite: bool
     created_at: datetime
+
+
+class ExpenseCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=140)
+    amount: str = Field(min_length=1, max_length=120)
+    note: str = ""
+
+
+class ExpenseUpdate(BaseModel):
+    title: str = Field(min_length=1, max_length=140)
+    amount: str = Field(min_length=1, max_length=120)
+    note: str = ""
+
+
+class ExpenseRead(BaseModel):
+    id: str
+    title: str
+    amount: str
+    note: str
+    created_at: datetime
