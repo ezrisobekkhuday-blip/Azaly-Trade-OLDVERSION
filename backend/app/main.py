@@ -20,6 +20,7 @@ from .schemas import (
     ProfileUpdate,
     ShopCreate,
     ShopRead,
+    StorefrontItemPayload,
     ShopUpdate,
 )
 
@@ -89,6 +90,11 @@ def ensure_shop_columns() -> None:
         if "storefront_images" not in columns:
             connection.execute(
                 text("ALTER TABLE shops ADD COLUMN storefront_images JSON DEFAULT '[]' NOT NULL")
+            )
+
+        if "storefront_items" not in columns:
+            connection.execute(
+                text("ALTER TABLE shops ADD COLUMN storefront_items JSON DEFAULT '[]' NOT NULL")
             )
 
         if "storefront_image" in columns:
@@ -180,8 +186,100 @@ def resolve_storefront_images(payload: ShopCreate | ShopUpdate) -> list[str]:
     return []
 
 
+def normalize_storefront_item(
+    payload: StorefrontItemPayload | dict[str, str],
+) -> dict[str, str] | None:
+    if isinstance(payload, StorefrontItemPayload):
+        raw_image_path = payload.image_path
+        amount = payload.amount
+        color = payload.color
+        material = payload.material
+        size = payload.size
+    else:
+        raw_image_path = payload.get("image_path") or payload.get("imagePath") or ""
+        amount = payload.get("amount", "")
+        color = payload.get("color", "")
+        material = payload.get("material", "")
+        size = payload.get("size", "")
+
+    image_path = normalize_image_path(str(raw_image_path).strip())
+
+    if not image_path:
+        return None
+
+    return {
+        "image_path": image_path,
+        "amount": str(amount).strip(),
+        "color": str(color).strip(),
+        "material": str(material).strip(),
+        "size": str(size).strip(),
+    }
+
+
+def resolve_storefront_items(payload: ShopCreate | ShopUpdate) -> list[dict[str, str]]:
+    normalized_items: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    for item in payload.storefront_items:
+        normalized_item = normalize_storefront_item(item)
+
+        if normalized_item is None:
+            continue
+
+        image_path = normalized_item["image_path"]
+        if image_path in seen:
+            continue
+
+        normalized_items.append(normalized_item)
+        seen.add(image_path)
+
+    if normalized_items:
+        return normalized_items
+
+    return [{"image_path": image} for image in resolve_storefront_images(payload)]
+
+
+def get_shop_storefront_items(shop: Shop) -> list[dict[str, str]]:
+    normalized_items: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    for item in shop.storefront_items or []:
+        if not isinstance(item, dict):
+            continue
+
+        normalized_item = normalize_storefront_item(item)
+
+        if normalized_item is None:
+            continue
+
+        image_path = normalized_item["image_path"]
+        if image_path in seen:
+            continue
+
+        normalized_items.append(normalized_item)
+        seen.add(image_path)
+
+    if normalized_items:
+        return normalized_items
+
+    return [{"image_path": image} for image in get_shop_storefront_images(shop)]
+
+
 def get_shop_storefront_images(shop: Shop) -> list[str]:
     images = normalize_image_list(shop.storefront_images)
+
+    for item in shop.storefront_items or []:
+        if not isinstance(item, dict):
+            continue
+
+        normalized_item = normalize_storefront_item(item)
+
+        if normalized_item is None:
+            continue
+
+        image_path = normalized_item["image_path"]
+        if image_path not in images:
+            images.append(image_path)
 
     if shop.storefront_image and shop.storefront_image not in images:
         images.append(shop.storefront_image)
@@ -190,10 +288,17 @@ def get_shop_storefront_images(shop: Shop) -> list[str]:
 
 
 def serialize_shop(request: Request, shop: Shop, products_count: int = 0) -> ShopRead:
-    storefront_images = [
-        to_public_image_url(request, image)
-        for image in get_shop_storefront_images(shop)
-    ]
+    storefront_items = []
+
+    for item in get_shop_storefront_items(shop):
+        storefront_items.append(
+            {
+                **item,
+                "image_path": to_public_image_url(request, item["image_path"]),
+            }
+        )
+
+    storefront_images = [item["image_path"] for item in storefront_items]
 
     return ShopRead(
         id=str(shop.id),
@@ -203,6 +308,7 @@ def serialize_shop(request: Request, shop: Shop, products_count: int = 0) -> Sho
         latitude=shop.latitude,
         longitude=shop.longitude,
         description=shop.description,
+        storefront_items=storefront_items,
         storefront_images=storefront_images,
         storefront_image=storefront_images[0] if storefront_images else "",
         business_card_image=to_public_image_url(request, shop.business_card_image)
@@ -293,7 +399,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Azaly Trade API", version="0.5.0", lifespan=lifespan)
+app = FastAPI(title="Azaly Trade API", version="0.6.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -363,7 +469,8 @@ def create_shop(
     db: Session = Depends(get_db),
 ) -> ShopRead:
     validate_shop_photo(payload.photo)
-    storefront_images = resolve_storefront_images(payload)
+    storefront_items = resolve_storefront_items(payload)
+    storefront_images = [item["image_path"] for item in storefront_items]
 
     shop = Shop(
         name=normalize_shop_name(payload.name),
@@ -372,6 +479,7 @@ def create_shop(
         latitude=payload.latitude,
         longitude=payload.longitude,
         description=payload.description.strip(),
+        storefront_items=storefront_items,
         storefront_images=storefront_images,
         storefront_image=storefront_images[0] if storefront_images else "",
         business_card_image=normalize_image_path(payload.business_card_image.strip())
@@ -395,7 +503,8 @@ def update_shop(
     shop = get_shop_or_404(shop_id, db)
 
     new_photo = normalize_image_path(payload.photo.strip())
-    new_storefront_images = resolve_storefront_images(payload)
+    new_storefront_items = resolve_storefront_items(payload)
+    new_storefront_images = [item["image_path"] for item in new_storefront_items]
     new_storefront = new_storefront_images[0] if new_storefront_images else ""
     new_business_card = (
         normalize_image_path(payload.business_card_image.strip())
@@ -420,6 +529,7 @@ def update_shop(
     shop.latitude = payload.latitude
     shop.longitude = payload.longitude
     shop.description = payload.description.strip()
+    shop.storefront_items = new_storefront_items
     shop.storefront_images = new_storefront_images
     shop.storefront_image = new_storefront
     shop.business_card_image = new_business_card

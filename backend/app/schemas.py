@@ -17,6 +17,14 @@ class ProfileUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
 
 
+class StorefrontItemPayload(BaseModel):
+    image_path: str = Field(min_length=1)
+    amount: str = ""
+    color: str = ""
+    material: str = ""
+    size: str = ""
+
+
 class ShopCreate(BaseModel):
     name: str = Field(default="", max_length=120)
     photo: str = Field(min_length=1)
@@ -24,6 +32,7 @@ class ShopCreate(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     description: str = ""
+    storefront_items: list[StorefrontItemPayload] = Field(default_factory=list)
     storefront_images: list[str] = Field(default_factory=list)
     storefront_image: str = ""
     business_card_image: str = ""
@@ -36,6 +45,7 @@ class ShopUpdate(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     description: str = ""
+    storefront_items: list[StorefrontItemPayload] = Field(default_factory=list)
     storefront_images: list[str] = Field(default_factory=list)
     storefront_image: str = ""
     business_card_image: str = ""
@@ -49,6 +59,7 @@ class ShopRead(BaseModel):
     latitude: float | None
     longitude: float | None
     description: str
+    storefront_items: list[StorefrontItemPayload]
     storefront_images: list[str]
     storefront_image: str
     business_card_image: str
