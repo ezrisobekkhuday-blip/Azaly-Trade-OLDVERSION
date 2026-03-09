@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -226,6 +227,19 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  Widget _activeScreenView() {
+    if (!widget.store.isReady) {
+      return const AppBackground(
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return KeyedSubtree(
+      key: ValueKey(_selectedIndex),
+      child: _screenBuilders[_selectedIndex](),
+    );
+  }
+
   Widget _buildDesktopShell(
     AppStrings strings,
     List<_ShellDestination> destinations,
@@ -301,6 +315,7 @@ class _HomeShellState extends State<HomeShell> {
         }
 
         final useCompactMobileShell = constraints.maxWidth < 720;
+        final useDirectWebMobileRender = kIsWeb && useCompactMobileShell;
 
         return Scaffold(
           extendBody: true,
@@ -317,7 +332,9 @@ class _HomeShellState extends State<HomeShell> {
               ),
             ],
           ),
-          body: useCompactMobileShell
+          body: useDirectWebMobileRender
+              ? _activeScreenView()
+              : useCompactMobileShell
               ? (widget.store.isReady
                     ? _screenStack()
                     : const AppBackground(
