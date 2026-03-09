@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
@@ -384,173 +385,413 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
     final textTheme = Theme.of(context).textTheme;
     final strings = AppStrings.of(context);
 
+    if (kIsWeb) {
+      return AppBackground(
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: AppColors.border),
+                    gradient: const LinearGradient(
+                      colors: [Color(0x2E7C92FF), Color(0x1461E5BE)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        strings.t('createShopTitle'),
+                        style: textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        strings.t('createShopDescription'),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                _SurfaceCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        strings.t('shopPhoto'),
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : () => _pickShopPhoto(ImageSource.gallery),
+                              icon: const Icon(Icons.photo_library_outlined),
+                              label: Text(strings.t('gallery')),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : () => _pickShopPhoto(ImageSource.camera),
+                              icon: const Icon(Icons.photo_camera_outlined),
+                              label: Text(strings.t('camera')),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_shopPhotoPath.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(22),
+                          child: ProductImage(
+                            source: _shopPhotoPath,
+                            width: double.infinity,
+                            height: 210,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _nameController,
+                        decoration: InputDecoration(
+                          labelText: strings.t('shopNameLabel'),
+                          hintText: strings.t('shopNameOptionalHint'),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _locationController,
+                        decoration: InputDecoration(
+                          labelText: strings.t('shopLocationLabel'),
+                          hintText: strings.t('shopLocationHint'),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _descriptionController,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          labelText: strings.t('extraDescriptionLabel'),
+                          hintText: strings.t('extraDescriptionHint'),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        strings.t('storefrontPhotos'),
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : _pickStorefrontFromGallery,
+                              icon: const Icon(Icons.photo_library_outlined),
+                              label: Text(strings.t('gallery')),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : _pickStorefrontFromCamera,
+                              icon: const Icon(Icons.photo_camera_outlined),
+                              label: Text(strings.t('camera')),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (_storefrontItems.isEmpty)
+                        Text(
+                          strings.t('storefrontHelper'),
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        )
+                      else
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: List<Widget>.generate(
+                            _storefrontItems.length,
+                            (index) => _StorefrontItemSummaryCard(
+                              item: _storefrontItems[index],
+                              onEdit: _isSubmitting
+                                  ? null
+                                  : () => _editStorefrontItem(index),
+                              onRemove: _isSubmitting
+                                  ? null
+                                  : () => setState(
+                                      () => _storefrontItems.removeAt(index),
+                                    ),
+                            ),
+                            growable: false,
+                          ),
+                        ),
+                      const SizedBox(height: 14),
+                      Text(
+                        strings.t('businessCardTitle'),
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : () =>
+                                        _pickBusinessCard(ImageSource.gallery),
+                              icon: const Icon(Icons.photo_library_outlined),
+                              label: Text(strings.t('gallery')),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : () => _pickBusinessCard(ImageSource.camera),
+                              icon: const Icon(Icons.photo_camera_outlined),
+                              label: Text(strings.t('camera')),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_businessCardPath.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(22),
+                          child: ProductImage(
+                            source: _businessCardPath,
+                            width: double.infinity,
+                            height: 180,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 18),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: const Color(0xFF04120F),
+                          minimumSize: const Size.fromHeight(56),
+                        ),
+                        onPressed: _isSubmitting ? null : _createShop,
+                        child: Text(
+                          _isSubmitting
+                              ? strings.t('savingShop')
+                              : strings.t('saveShop'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _HeroCard(
+          totalShops: widget.store.shops.length,
+          hasPhoto: _shopPhotoPath.isNotEmpty,
+        ),
+        const SizedBox(height: 18),
+        _SurfaceCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                strings.t('createShopTitle'),
+                style: textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                strings.t('createShopDescription'),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _ImagePickerCard(
+                title: strings.t('shopPhoto'),
+                imagePath: _shopPhotoPath,
+                onGallery: _isSubmitting
+                    ? null
+                    : () => _pickShopPhoto(ImageSource.gallery),
+                onCamera: _isSubmitting
+                    ? null
+                    : () => _pickShopPhoto(ImageSource.camera),
+                onClear: _shopPhotoPath.isEmpty || _isSubmitting
+                    ? null
+                    : () => setState(() => _shopPhotoPath = ''),
+              ),
+              const SizedBox(height: 14),
+              _StorefrontItemsCard(
+                title: strings.t('storefrontPhotos'),
+                helperText: strings.t('storefrontHelper'),
+                items: _storefrontItems,
+                onGallery: _isSubmitting ? null : _pickStorefrontFromGallery,
+                onCamera: _isSubmitting ? null : _pickStorefrontFromCamera,
+                onClearAll: _storefrontItems.isEmpty || _isSubmitting
+                    ? null
+                    : () => setState(_storefrontItems.clear),
+                onEditAt: _isSubmitting ? null : _editStorefrontItem,
+                onRemoveAt: _isSubmitting
+                    ? null
+                    : (index) =>
+                          setState(() => _storefrontItems.removeAt(index)),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                  labelText: strings.t('shopNameLabel'),
+                  hintText: strings.t('shopNameOptionalHint'),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _locationController,
+                decoration: InputDecoration(
+                  labelText: strings.t('shopLocationLabel'),
+                  hintText: strings.t('shopLocationHint'),
+                  suffixIcon: _isResolvingLocation
+                      ? const Padding(
+                          padding: EdgeInsets.all(14),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : IconButton(
+                          onPressed: _isSubmitting
+                              ? null
+                              : _fillCurrentLocation,
+                          tooltip: strings.t('detectLocation'),
+                          icon: const Icon(Icons.my_location_outlined),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _ShopLocationCard(
+                latitude: _selectedLatitude,
+                longitude: _selectedLongitude,
+                onPickOnMap: _pickLocationOnMap,
+                onUseCurrentLocation: _isSubmitting
+                    ? null
+                    : _fillCurrentLocation,
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _descriptionController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: strings.t('extraDescriptionLabel'),
+                  hintText: strings.t('extraDescriptionHint'),
+                ),
+              ),
+              const SizedBox(height: 14),
+              _ImagePickerCard(
+                title: strings.t('businessCardTitle'),
+                imagePath: _businessCardPath,
+                onGallery: _isSubmitting
+                    ? null
+                    : () => _pickBusinessCard(ImageSource.gallery),
+                onCamera: _isSubmitting
+                    ? null
+                    : () => _pickBusinessCard(ImageSource.camera),
+                onClear: _businessCardPath.isEmpty || _isSubmitting
+                    ? null
+                    : () => setState(() => _businessCardPath = ''),
+              ),
+              const SizedBox(height: 18),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: const Color(0xFF04120F),
+                  minimumSize: const Size.fromHeight(56),
+                ),
+                onPressed: _isSubmitting ? null : _createShop,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _isSubmitting
+                            ? strings.t('savingShop')
+                            : strings.t('saveShop'),
+                        style: textTheme.titleMedium?.copyWith(
+                          color: const Color(0xFF04120F),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    _isSubmitting
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: Color(0xFF04120F),
+                            ),
+                          )
+                        : const Icon(Icons.storefront_outlined),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+
     return AppBackground(
       child: SafeArea(
         top: false,
-        child: ListView(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-          children: [
-            _HeroCard(
-              totalShops: widget.store.shops.length,
-              hasPhoto: _shopPhotoPath.isNotEmpty,
-            ),
-            const SizedBox(height: 18),
-            _SurfaceCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    strings.t('createShopTitle'),
-                    style: textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    strings.t('createShopDescription'),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _ImagePickerCard(
-                    title: strings.t('shopPhoto'),
-                    imagePath: _shopPhotoPath,
-                    onGallery: _isSubmitting
-                        ? null
-                        : () => _pickShopPhoto(ImageSource.gallery),
-                    onCamera: _isSubmitting
-                        ? null
-                        : () => _pickShopPhoto(ImageSource.camera),
-                    onClear: _shopPhotoPath.isEmpty || _isSubmitting
-                        ? null
-                        : () => setState(() => _shopPhotoPath = ''),
-                  ),
-                  const SizedBox(height: 14),
-                  _StorefrontItemsCard(
-                    title: strings.t('storefrontPhotos'),
-                    helperText: strings.t('storefrontHelper'),
-                    items: _storefrontItems,
-                    onGallery: _isSubmitting
-                        ? null
-                        : _pickStorefrontFromGallery,
-                    onCamera: _isSubmitting ? null : _pickStorefrontFromCamera,
-                    onClearAll: _storefrontItems.isEmpty || _isSubmitting
-                        ? null
-                        : () => setState(_storefrontItems.clear),
-                    onEditAt: _isSubmitting ? null : _editStorefrontItem,
-                    onRemoveAt: _isSubmitting
-                        ? null
-                        : (index) =>
-                              setState(() => _storefrontItems.removeAt(index)),
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: _nameController,
-                    decoration: InputDecoration(
-                      labelText: strings.t('shopNameLabel'),
-                      hintText: strings.t('shopNameOptionalHint'),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: _locationController,
-                    decoration: InputDecoration(
-                      labelText: strings.t('shopLocationLabel'),
-                      hintText: strings.t('shopLocationHint'),
-                      suffixIcon: _isResolvingLocation
-                          ? const Padding(
-                              padding: EdgeInsets.all(14),
-                              child: SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            )
-                          : IconButton(
-                              onPressed: _isSubmitting
-                                  ? null
-                                  : _fillCurrentLocation,
-                              tooltip: strings.t('detectLocation'),
-                              icon: const Icon(Icons.my_location_outlined),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _ShopLocationCard(
-                    latitude: _selectedLatitude,
-                    longitude: _selectedLongitude,
-                    onPickOnMap: _pickLocationOnMap,
-                    onUseCurrentLocation: _isSubmitting
-                        ? null
-                        : _fillCurrentLocation,
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: _descriptionController,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      labelText: strings.t('extraDescriptionLabel'),
-                      hintText: strings.t('extraDescriptionHint'),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _ImagePickerCard(
-                    title: strings.t('businessCardTitle'),
-                    imagePath: _businessCardPath,
-                    onGallery: _isSubmitting
-                        ? null
-                        : () => _pickBusinessCard(ImageSource.gallery),
-                    onCamera: _isSubmitting
-                        ? null
-                        : () => _pickBusinessCard(ImageSource.camera),
-                    onClear: _businessCardPath.isEmpty || _isSubmitting
-                        ? null
-                        : () => setState(() => _businessCardPath = ''),
-                  ),
-                  const SizedBox(height: 18),
-                  FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: const Color(0xFF04120F),
-                      minimumSize: const Size.fromHeight(56),
-                    ),
-                    onPressed: _isSubmitting ? null : _createShop,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _isSubmitting
-                                ? strings.t('savingShop')
-                                : strings.t('saveShop'),
-                            style: textTheme.titleMedium?.copyWith(
-                              color: const Color(0xFF04120F),
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        _isSubmitting
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.2,
-                                  color: Color(0xFF04120F),
-                                ),
-                              )
-                            : const Icon(Icons.storefront_outlined),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          child: content,
         ),
       ),
     );
@@ -881,6 +1122,22 @@ class _StorefrontItemsCard extends StatelessWidget {
               helperText,
               style: textTheme.bodyMedium?.copyWith(
                 color: AppColors.textSecondary,
+              ),
+            )
+          else if (kIsWeb)
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: List<Widget>.generate(
+                items.length,
+                (index) => _StorefrontItemSummaryCard(
+                  item: items[index],
+                  onEdit: onEditAt == null ? null : () => onEditAt!(index),
+                  onRemove: onRemoveAt == null
+                      ? null
+                      : () => onRemoveAt!(index),
+                ),
+                growable: false,
               ),
             )
           else
