@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../models/expense.dart';
 import '../models/product.dart';
 import '../models/shop.dart';
 
@@ -25,12 +26,22 @@ class ApiClient {
     final profilePayload = _decodeResponse(responses[0]);
     final shopsPayload = _decodeResponse(responses[1]);
     final productsPayload = _decodeResponse(responses[2]);
+    dynamic expensesPayload = const <Map<String, dynamic>>[];
+
+    try {
+      final expensesResponse = await _client.get(_uri('/expenses'));
+      expensesPayload = _decodeResponse(expensesResponse);
+    } catch (_) {
+      expensesPayload = const <Map<String, dynamic>>[];
+    }
 
     if (profilePayload is! Map<String, dynamic>) {
       throw const ApiException('Invalid profile response.');
     }
 
-    if (shopsPayload is! List || productsPayload is! List) {
+    if (shopsPayload is! List ||
+        productsPayload is! List ||
+        expensesPayload is! List) {
       throw const ApiException('Invalid catalog response.');
     }
 
@@ -43,6 +54,10 @@ class ApiClient {
       products: productsPayload
           .whereType<Map<String, dynamic>>()
           .map(Product.fromJson)
+          .toList(),
+      expenses: expensesPayload
+          .whereType<Map<String, dynamic>>()
+          .map(Expense.fromJson)
           .toList(),
     );
   }
@@ -239,6 +254,54 @@ class ApiClient {
     }
   }
 
+  Future<Expense> createExpense({
+    required String title,
+    required String amount,
+    required String note,
+  }) async {
+    final response = await _client.post(
+      _uri('/expenses'),
+      headers: _jsonHeaders,
+      body: jsonEncode({'title': title, 'amount': amount, 'note': note}),
+    );
+
+    final payload = _decodeResponse(response);
+
+    if (payload is! Map<String, dynamic>) {
+      throw const ApiException('Invalid expense response.');
+    }
+
+    return Expense.fromJson(payload);
+  }
+
+  Future<Expense> updateExpense(Expense expense) async {
+    final response = await _client.put(
+      _uri('/expenses/${expense.id}'),
+      headers: _jsonHeaders,
+      body: jsonEncode({
+        'title': expense.title,
+        'amount': expense.amount,
+        'note': expense.note,
+      }),
+    );
+
+    final payload = _decodeResponse(response);
+
+    if (payload is! Map<String, dynamic>) {
+      throw const ApiException('Invalid expense response.');
+    }
+
+    return Expense.fromJson(payload);
+  }
+
+  Future<void> deleteExpense(String expenseId) async {
+    final response = await _client.delete(_uri('/expenses/$expenseId'));
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      _decodeResponse(response);
+    }
+  }
+
   void dispose() {
     _client.close();
   }
@@ -287,11 +350,13 @@ class AppBootstrap {
     required this.displayName,
     required this.shops,
     required this.products,
+    required this.expenses,
   });
 
   final String displayName;
   final List<Shop> shops;
   final List<Product> products;
+  final List<Expense> expenses;
 }
 
 class ApiException implements Exception {

@@ -4,23 +4,14 @@ import '../localization/app_strings.dart';
 import '../theme/app_theme.dart';
 
 class SettingsSheetResult {
-  const SettingsSheetResult({
-    required this.displayName,
-    required this.language,
-  });
+  const SettingsSheetResult({required this.language});
 
-  final String displayName;
   final AppLanguage language;
 }
 
 class SettingsSheet extends StatefulWidget {
-  const SettingsSheet({
-    super.key,
-    required this.initialName,
-    required this.initialLanguage,
-  });
+  const SettingsSheet({super.key, required this.initialLanguage});
 
-  final String initialName;
   final AppLanguage initialLanguage;
 
   @override
@@ -28,28 +19,17 @@ class SettingsSheet extends StatefulWidget {
 }
 
 class _SettingsSheetState extends State<SettingsSheet> {
-  late final TextEditingController _controller;
   late AppLanguage _selectedLanguage;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.initialName);
     _selectedLanguage = widget.initialLanguage;
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final previewName = _controller.text.trim().isEmpty
-        ? 'Azaly Trade'
-        : _controller.text.trim();
     final strings = AppStrings(_selectedLanguage);
 
     return Padding(
@@ -76,22 +56,6 @@ class _SettingsSheetState extends State<SettingsSheet> {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 10),
-              Text(
-                strings.t('settingsDescription'),
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 18),
-              TextField(
-                controller: _controller,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  labelText: strings.t('yourName'),
-                  hintText: strings.t('nameHint'),
-                ),
-              ),
               const SizedBox(height: 16),
               Text(
                 strings.t('language'),
@@ -114,33 +78,6 @@ class _SettingsSheetState extends State<SettingsSheet> {
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceStrong,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      strings.t('preview'),
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      previewName,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
@@ -150,12 +87,9 @@ class _SettingsSheetState extends State<SettingsSheet> {
                     foregroundColor: const Color(0xFF08110F),
                     minimumSize: const Size.fromHeight(56),
                   ),
-                  onPressed: () => Navigator.of(context).pop(
-                    SettingsSheetResult(
-                      displayName: _controller.text,
-                      language: _selectedLanguage,
-                    ),
-                  ),
+                  onPressed: () => Navigator.of(
+                    context,
+                  ).pop(SettingsSheetResult(language: _selectedLanguage)),
                   child: Text(strings.t('save')),
                 ),
               ),

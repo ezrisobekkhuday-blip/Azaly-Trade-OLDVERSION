@@ -142,7 +142,7 @@ double? calculateNetTotal(String amount, int quantity) {
     return null;
   }
 
-  return grossTotal - (grossTotal * supplierShareRate);
+  return grossTotal + (grossTotal * supplierShareRate);
 }
 
 String formatProductMoney(double value) {

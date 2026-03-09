@@ -3,9 +3,10 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'localization/app_strings.dart';
 import 'screens/create_shop_screen.dart';
+import 'screens/dashboard_screen.dart';
+import 'screens/expenses_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/shops_screen.dart';
-import 'services/api_client.dart';
 import 'state/app_store.dart';
 import 'theme/app_theme.dart';
 import 'widgets/app_background.dart';
@@ -88,6 +89,28 @@ class _HomeShellState extends State<HomeShell> {
   late final List<Widget Function()> _screenBuilders;
   final Set<int> _activatedIndexes = {0};
 
+  String _dashboardTabLabel(AppLanguage language) {
+    switch (language) {
+      case AppLanguage.ru:
+        return 'Дашборд';
+      case AppLanguage.en:
+        return 'Dashboard';
+      case AppLanguage.zh:
+        return '看板';
+    }
+  }
+
+  String _expensesTabLabel(AppLanguage language) {
+    switch (language) {
+      case AppLanguage.ru:
+        return 'Расходы';
+      case AppLanguage.en:
+        return 'Expenses';
+      case AppLanguage.zh:
+        return '支出';
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -97,6 +120,8 @@ class _HomeShellState extends State<HomeShell> {
         onOpenShops: () => _selectTab(1),
       ),
       () => ShopsScreen(store: widget.store),
+      () => DashboardScreen(store: widget.store),
+      () => ExpensesScreen(store: widget.store),
       () => FavoritesScreen(store: widget.store),
     ];
   }
@@ -114,10 +139,7 @@ class _HomeShellState extends State<HomeShell> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => SettingsSheet(
-        initialName: widget.store.displayName,
-        initialLanguage: widget.store.language,
-      ),
+      builder: (_) => SettingsSheet(initialLanguage: widget.store.language),
     );
 
     if (result == null || !mounted) {
@@ -126,32 +148,6 @@ class _HomeShellState extends State<HomeShell> {
 
     if (result.language != widget.store.language) {
       await widget.store.updateLanguage(result.language);
-    }
-
-    final normalizedName = result.displayName.trim().isEmpty
-        ? 'Azaly Trade'
-        : result.displayName.trim();
-
-    if (normalizedName == widget.store.displayName) {
-      return;
-    }
-
-    try {
-      await widget.store.updateName(normalizedName);
-    } catch (error) {
-      if (mounted) {
-        final strings = AppStrings.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              describeError(
-                error,
-                fallbackMessage: strings.t('saveNameFailed'),
-              ),
-            ),
-          ),
-        );
-      }
     }
   }
 
@@ -205,6 +201,16 @@ class _HomeShellState extends State<HomeShell> {
                 icon: const Icon(Icons.storefront_outlined),
                 selectedIcon: const Icon(Icons.storefront),
                 label: strings.t('shopsTab'),
+              ),
+              NavigationDestination(
+                icon: const Icon(Icons.space_dashboard_outlined),
+                selectedIcon: const Icon(Icons.space_dashboard),
+                label: _dashboardTabLabel(strings.language),
+              ),
+              NavigationDestination(
+                icon: const Icon(Icons.receipt_long_outlined),
+                selectedIcon: const Icon(Icons.receipt_long),
+                label: _expensesTabLabel(strings.language),
               ),
               NavigationDestination(
                 icon: const Icon(Icons.favorite_border),

@@ -87,7 +87,7 @@ class FavoritesScreen extends StatelessWidget {
       '${strings.t('purchasePriceLabel')}: ${product.amount.isEmpty ? strings.t('notSpecified') : product.amount}',
       '${strings.t('quantityLabel')}: ${product.quantity}',
       '${strings.t('grossTotalLabel')}: ${grossTotal == null ? strings.t('notSpecified') : formatProductMoney(grossTotal)}',
-      '${strings.t('supplierShareLabel')}: ${supplierShare == null ? strings.t('notSpecified') : '-${formatProductMoney(supplierShare)}'}',
+      '${strings.t('supplierShareLabel')}: ${supplierShare == null ? strings.t('notSpecified') : '+${formatProductMoney(supplierShare)}'}',
       '${strings.t('totalLabel')}: ${product.totalValue == null ? strings.t('notSpecified') : formatProductMoney(product.totalValue!)}',
       '${strings.t('colorLabel')}: ${product.color.isEmpty ? strings.t('notSpecified') : localizeColorValue(language, product.color)}',
       '${strings.t('materialLabel')}: ${product.material.isEmpty ? strings.t('notSpecified') : localizeMaterialValue(language, product.material)}',

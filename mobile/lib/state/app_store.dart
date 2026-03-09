@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../localization/app_strings.dart';
+import '../models/expense.dart';
 import '../models/product.dart';
 import '../models/shop.dart';
 import '../services/api_client.dart';
@@ -19,6 +20,7 @@ class AppStore extends ChangeNotifier {
   final List<String> _pinnedShopIds = [];
   final List<Shop> _shops = [];
   final List<Product> _products = [];
+  final List<Expense> _expenses = [];
 
   bool get isReady => _isReady;
   String get displayName => _displayName;
@@ -46,6 +48,7 @@ class AppStore extends ChangeNotifier {
   }
 
   List<Product> get allProducts => List.unmodifiable(_products);
+  List<Expense> get expenses => List.unmodifiable(_expenses);
   List<Product> get favoriteProducts =>
       List.unmodifiable(_products.where((product) => product.isFavorite));
   List<FavoriteStorefrontEntry> get favoriteStorefrontItems {
@@ -132,12 +135,16 @@ class AppStore extends ChangeNotifier {
       _products
         ..clear()
         ..addAll(bootstrap.products);
+      _expenses
+        ..clear()
+        ..addAll(bootstrap.expenses);
       _syncShopCounts();
       await _cleanupPinnedShops();
     } catch (_) {
       _displayName = 'Azaly Trade';
       _shops.clear();
       _products.clear();
+      _expenses.clear();
     }
 
     _isReady = true;
@@ -319,6 +326,40 @@ class AppStore extends ChangeNotifier {
     await _apiClient.deleteProduct(productId);
     _products.removeWhere((product) => product.id == productId);
     _syncShopCounts();
+    notifyListeners();
+  }
+
+  Future<void> createExpense({
+    required String title,
+    required String amount,
+    required String note,
+  }) async {
+    final createdExpense = await _apiClient.createExpense(
+      title: title.trim(),
+      amount: amount.trim(),
+      note: note.trim(),
+    );
+
+    _expenses.insert(0, createdExpense);
+    notifyListeners();
+  }
+
+  Future<void> updateExpense(Expense updatedExpense) async {
+    final index = _expenses.indexWhere(
+      (expense) => expense.id == updatedExpense.id,
+    );
+
+    if (index == -1) {
+      return;
+    }
+
+    _expenses[index] = await _apiClient.updateExpense(updatedExpense);
+    notifyListeners();
+  }
+
+  Future<void> deleteExpense(String expenseId) async {
+    await _apiClient.deleteExpense(expenseId);
+    _expenses.removeWhere((expense) => expense.id == expenseId);
     notifyListeners();
   }
 

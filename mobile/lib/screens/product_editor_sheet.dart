@@ -401,7 +401,7 @@ class _EditorPurchaseSummaryCard extends StatelessWidget {
           if (total != null && supplierShare != null) ...[
             const SizedBox(height: 6),
             Text(
-              '${strings.t('supplierShareLabel')}: -${formatProductMoney(supplierShare)}',
+              '${strings.t('supplierShareLabel')}: +${formatProductMoney(supplierShare)}',
               style: textTheme.bodyMedium?.copyWith(
                 color: AppColors.textSecondary,
               ),
