@@ -383,6 +383,10 @@ String _resolveBaseUrl() {
     return configuredUrl;
   }
 
+  if (kIsWeb) {
+    return Uri.base.origin;
+  }
+
   if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
     return 'http://34.173.218.175:8080';
   }

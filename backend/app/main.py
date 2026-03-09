@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, inspect, select, text
 from sqlalchemy.orm import Session
@@ -29,6 +30,8 @@ from .schemas import (
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 UPLOADS_DIR = BASE_DIR / "uploads"
+FRONTEND_DIR = BASE_DIR / "webapp"
+FRONTEND_INDEX = FRONTEND_DIR / "index.html"
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -175,6 +178,37 @@ def normalize_image_list(images: list[str]) -> list[str]:
         seen.add(cleaned)
 
     return normalized
+
+
+def resolve_frontend_asset(path: str) -> Path | None:
+    candidate = (FRONTEND_DIR / path).resolve()
+
+    try:
+        candidate.relative_to(FRONTEND_DIR.resolve())
+    except ValueError:
+        return None
+
+    if candidate.is_file():
+        return candidate
+
+    return None
+
+
+def is_reserved_backend_path(path: str) -> bool:
+    reserved_prefixes = (
+        "health",
+        "profile",
+        "shops",
+        "products",
+        "expenses",
+        "media",
+        "uploads",
+        "docs",
+        "redoc",
+        "openapi.json",
+    )
+
+    return any(path == prefix or path.startswith(f"{prefix}/") for prefix in reserved_prefixes)
 
 
 def resolve_storefront_images(payload: ShopCreate | ShopUpdate) -> list[str]:
@@ -734,3 +768,39 @@ def delete_expense(expense_id: int, db: Session = Depends(get_db)) -> None:
 
     db.delete(expense)
     db.commit()
+
+
+@app.get("/", include_in_schema=False)
+def serve_frontend_root() -> FileResponse:
+    if not FRONTEND_INDEX.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Frontend build not found.",
+        )
+
+    return FileResponse(FRONTEND_INDEX)
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def serve_frontend(full_path: str) -> FileResponse:
+    if not FRONTEND_INDEX.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Frontend build not found.",
+        )
+
+    cleaned_path = full_path.strip("/")
+
+    if cleaned_path:
+        asset = resolve_frontend_asset(cleaned_path)
+
+        if asset is not None:
+            return FileResponse(asset)
+
+        if is_reserved_backend_path(cleaned_path):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Route not found.",
+            )
+
+    return FileResponse(FRONTEND_INDEX)

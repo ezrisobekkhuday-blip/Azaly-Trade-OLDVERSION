@@ -64,6 +64,31 @@ Notes:
 - The app already uses the FastAPI server URL configured in the Flutter code or `--dart-define=AZALY_API_URL=...`.
 - PWA install behavior works correctly on `localhost` and HTTPS. If you open it from plain `http` on a random IP, the web app can still work, but install/camera/geolocation behavior may be limited by the browser.
 
+## Deploy web to the same FastAPI server
+
+The backend can serve the Flutter web build directly from `backend/webapp`.
+
+1. Build the web app:
+
+```bash
+cd mobile
+flutter build web
+```
+
+2. Copy the build files to the server:
+
+```bash
+scp -r build/web/* azalysklad@server-1:~/Azaly-Trade/backend/webapp/
+```
+
+3. Restart the backend service or `uvicorn`.
+
+4. Open the same backend URL in a browser. Example:
+
+```text
+http://34.173.218.175:8080/
+```
+
 ## Run backend
 
 ```bash
