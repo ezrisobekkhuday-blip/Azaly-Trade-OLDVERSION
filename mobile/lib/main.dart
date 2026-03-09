@@ -315,7 +315,9 @@ class _HomeShellState extends State<HomeShell> {
           ),
           body: Align(
             alignment: Alignment.topCenter,
-            child: ConstrainedBox(
+            child: Container(
+              width: double.infinity,
+              height: double.infinity,
               constraints: const BoxConstraints(
                 maxWidth: _tabletContentMaxWidth,
               ),
