@@ -212,14 +212,16 @@ class _HomeShellState extends State<HomeShell> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return IndexedStack(
-      index: _selectedIndex,
-      children: List<Widget>.generate(
-        _screenBuilders.length,
-        (index) => _activatedIndexes.contains(index)
-            ? _screenBuilders[index]()
-            : const SizedBox.shrink(),
-        growable: false,
+    return SizedBox.expand(
+      child: IndexedStack(
+        index: _selectedIndex,
+        children: List<Widget>.generate(
+          _screenBuilders.length,
+          (index) => _activatedIndexes.contains(index)
+              ? _screenBuilders[index]()
+              : const SizedBox.shrink(),
+          growable: false,
+        ),
       ),
     );
   }
@@ -298,6 +300,8 @@ class _HomeShellState extends State<HomeShell> {
           return _buildDesktopShell(strings, destinations);
         }
 
+        final useCompactMobileShell = constraints.maxWidth < 720;
+
         return Scaffold(
           extendBody: true,
           appBar: AppBar(
@@ -313,21 +317,29 @@ class _HomeShellState extends State<HomeShell> {
               ),
             ],
           ),
-          body: Align(
-            alignment: Alignment.topCenter,
-            child: Container(
-              width: double.infinity,
-              height: double.infinity,
-              constraints: const BoxConstraints(
-                maxWidth: _tabletContentMaxWidth,
-              ),
-              child: widget.store.isReady
-                  ? _screenStack()
-                  : const AppBackground(
-                      child: Center(child: CircularProgressIndicator()),
+          body: useCompactMobileShell
+              ? (widget.store.isReady
+                    ? _screenStack()
+                    : const AppBackground(
+                        child: Center(child: CircularProgressIndicator()),
+                      ))
+              : Align(
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: double.infinity,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: _tabletContentMaxWidth,
+                      ),
+                      child: widget.store.isReady
+                          ? _screenStack()
+                          : const AppBackground(
+                              child: Center(child: CircularProgressIndicator()),
+                            ),
                     ),
-            ),
-          ),
+                  ),
+                ),
           bottomNavigationBar: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 920),
