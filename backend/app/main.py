@@ -194,6 +194,17 @@ def resolve_frontend_asset(path: str) -> Path | None:
     return None
 
 
+def frontend_file_response(path: Path) -> FileResponse:
+    return FileResponse(
+        path,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
+
+
 def is_reserved_backend_path(path: str) -> bool:
     reserved_prefixes = (
         "health",
@@ -778,7 +789,7 @@ def serve_frontend_root() -> FileResponse:
             detail="Frontend build not found.",
         )
 
-    return FileResponse(FRONTEND_INDEX)
+    return frontend_file_response(FRONTEND_INDEX)
 
 
 @app.get("/{full_path:path}", include_in_schema=False)
@@ -795,7 +806,7 @@ def serve_frontend(full_path: str) -> FileResponse:
         asset = resolve_frontend_asset(cleaned_path)
 
         if asset is not None:
-            return FileResponse(asset)
+            return frontend_file_response(asset)
 
         if is_reserved_backend_path(cleaned_path):
             raise HTTPException(
@@ -803,4 +814,4 @@ def serve_frontend(full_path: str) -> FileResponse:
                 detail="Route not found.",
             )
 
-    return FileResponse(FRONTEND_INDEX)
+    return frontend_file_response(FRONTEND_INDEX)
