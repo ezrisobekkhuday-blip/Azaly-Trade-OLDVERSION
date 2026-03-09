@@ -147,7 +147,11 @@ def to_public_image_url(request: Request, image_path: str) -> str:
         return image_path
 
     if image_path.startswith("/uploads/"):
-        return f"{str(request.base_url).rstrip('/')}{image_path}"
+        forwarded_proto = request.headers.get("x-forwarded-proto", "")
+        forwarded_host = request.headers.get("x-forwarded-host", "")
+        scheme = (forwarded_proto.split(",")[0].strip() if forwarded_proto else request.url.scheme)
+        host = (forwarded_host.split(",")[0].strip() if forwarded_host else request.headers.get("host", request.url.netloc))
+        return f"{scheme}://{host}{image_path}"
 
     return image_path
 
@@ -409,6 +413,42 @@ def delete_uploaded_image(image_path: str) -> None:
         file_path.unlink()
 
 
+def collect_referenced_images(db: Session) -> set[str]:
+    referenced_images: set[str] = set()
+
+    for shop in db.scalars(select(Shop)).all():
+        if shop.photo:
+            referenced_images.add(normalize_image_path(shop.photo))
+
+        if shop.business_card_image:
+            referenced_images.add(normalize_image_path(shop.business_card_image))
+
+        for image in get_shop_storefront_images(shop):
+            referenced_images.add(normalize_image_path(image))
+
+    for product in db.scalars(select(Product)).all():
+        for image in product.images or []:
+            referenced_images.add(normalize_image_path(image))
+
+    return referenced_images
+
+
+def remove_unused_uploaded_images(db: Session, image_paths: list[str]) -> None:
+    pending_images = {
+        normalize_image_path(image_path)
+        for image_path in image_paths
+        if normalize_image_path(image_path).startswith("/uploads/")
+    }
+
+    if not pending_images:
+        return
+
+    referenced_images = collect_referenced_images(db)
+
+    for image_path in pending_images - referenced_images:
+        delete_uploaded_image(image_path)
+
+
 def validate_product_images(images: list[str]) -> None:
     if not images:
         raise HTTPException(
@@ -598,8 +638,7 @@ def update_shop(
     db.commit()
     db.refresh(shop)
 
-    for image in set(removed_images):
-        delete_uploaded_image(image)
+    remove_unused_uploaded_images(db, removed_images)
 
     counts = build_shop_count_map(db)
     return serialize_shop(request, shop, counts.get(shop.id, 0))
@@ -627,8 +666,7 @@ def delete_shop(shop_id: int, db: Session = Depends(get_db)) -> None:
     db.delete(shop)
     db.commit()
 
-    for image in set(images_to_delete):
-        delete_uploaded_image(image)
+    remove_unused_uploaded_images(db, images_to_delete)
 
 
 @app.get("/shops/{shop_id}/products", response_model=list[ProductRead])
@@ -710,8 +748,7 @@ def update_product(
     db.commit()
     db.refresh(product)
 
-    for image in removed_images:
-        delete_uploaded_image(image)
+    remove_unused_uploaded_images(db, removed_images)
 
     return serialize_product(request, product, shop.name)
 
@@ -727,8 +764,7 @@ def delete_product(product_id: int, db: Session = Depends(get_db)) -> None:
     db.delete(product)
     db.commit()
 
-    for image in product_images:
-        delete_uploaded_image(image)
+    remove_unused_uploaded_images(db, product_images)
 
 
 @app.get("/expenses", response_model=list[ExpenseRead])
