@@ -1,12 +1,20 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../localization/app_strings.dart';
 import '../models/map_selection_result.dart';
 import '../models/shop.dart';
+import '../services/web_camera_capture.dart';
 import '../theme/app_theme.dart';
+import '../utils/image_source_utils.dart';
 import '../widgets/product_image.dart';
 import '../widgets/shop_map_preview.dart';
+import '../widgets/storefront_item_widgets.dart';
 import 'location_picker_page.dart';
+
+const double _pickedImageMaxDimension = 1440;
+const int _pickedImageQuality = 70;
 
 class ShopEditorSheet extends StatefulWidget {
   const ShopEditorSheet({super.key, required this.shop});
@@ -18,9 +26,11 @@ class ShopEditorSheet extends StatefulWidget {
 }
 
 class _ShopEditorSheetState extends State<ShopEditorSheet> {
+  final ImagePicker _picker = ImagePicker();
   late final TextEditingController _nameController;
   late final TextEditingController _locationController;
   late final TextEditingController _descriptionController;
+  late final List<StorefrontItem> _storefrontItems;
   double? _latitude;
   double? _longitude;
 
@@ -32,6 +42,7 @@ class _ShopEditorSheetState extends State<ShopEditorSheet> {
     _descriptionController = TextEditingController(
       text: widget.shop.description,
     );
+    _storefrontItems = List<StorefrontItem>.from(widget.shop.storefrontItems);
     _latitude = widget.shop.latitude;
     _longitude = widget.shop.longitude;
   }
@@ -69,6 +80,102 @@ class _ShopEditorSheetState extends State<ShopEditorSheet> {
     });
   }
 
+  Future<void> _pickStorefrontFromGallery() async {
+    try {
+      final pickedFiles = await _picker.pickMultiImage(
+        imageQuality: _pickedImageQuality,
+        maxWidth: _pickedImageMaxDimension,
+        maxHeight: _pickedImageMaxDimension,
+      );
+
+      if (!mounted || pickedFiles.isEmpty) {
+        return;
+      }
+
+      final imageSources = await Future.wait(
+        pickedFiles.map(normalizePickedImageSource),
+      );
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _storefrontItems.addAll(
+          imageSources.map((source) => StorefrontItem(imagePath: source)),
+        );
+      });
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.of(context).t('cannotLoadStorefront'))),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickStorefrontFromCamera() async {
+    try {
+      if (kIsWeb) {
+        final imageSource = await captureImageWithWebCamera(context);
+
+        if (!mounted || imageSource == null || imageSource.isEmpty) {
+          return;
+        }
+
+        setState(() {
+          _storefrontItems.add(StorefrontItem(imagePath: imageSource));
+        });
+        return;
+      }
+
+      final file = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: _pickedImageQuality,
+        maxWidth: _pickedImageMaxDimension,
+        maxHeight: _pickedImageMaxDimension,
+      );
+
+      if (!mounted || file == null) {
+        return;
+      }
+
+      final imageSource = await normalizePickedImageSource(file);
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _storefrontItems.add(StorefrontItem(imagePath: imageSource));
+      });
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppStrings.of(context).t('cannotOpenStorefrontCamera')),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _editStorefrontItem(int index) async {
+    final updatedItem = await showModalBottomSheet<StorefrontItem>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StorefrontItemEditorSheet(item: _storefrontItems[index]),
+    );
+
+    if (updatedItem == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _storefrontItems[index] = updatedItem;
+    });
+  }
+
   void _save() {
     Navigator.of(context).pop(
       widget.shop.copyWith(
@@ -77,6 +184,7 @@ class _ShopEditorSheetState extends State<ShopEditorSheet> {
         latitude: _latitude,
         longitude: _longitude,
         description: _descriptionController.text.trim(),
+        storefrontItems: _storefrontItems,
       ),
     );
   }
@@ -177,6 +285,72 @@ class _ShopEditorSheetState extends State<ShopEditorSheet> {
                   decoration: InputDecoration(
                     labelText: strings.t('extraDescriptionLabel'),
                     hintText: strings.t('shortShopDescriptionHint'),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        strings.t('storefrontPhotos'),
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed: _pickStorefrontFromGallery,
+                              icon: const Icon(Icons.photo_library_outlined),
+                              label: Text(strings.t('gallery')),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed: _pickStorefrontFromCamera,
+                              icon: const Icon(Icons.photo_camera_outlined),
+                              label: Text(strings.t('camera')),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (_storefrontItems.isEmpty)
+                        Text(
+                          strings.t('storefrontHelper'),
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        )
+                      else
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: List<Widget>.generate(
+                            _storefrontItems.length,
+                            (index) => StorefrontItemSummaryCard(
+                              item: _storefrontItems[index],
+                              onEdit: () => _editStorefrontItem(index),
+                              onRemove: () {
+                                setState(() {
+                                  _storefrontItems.removeAt(index);
+                                });
+                              },
+                            ),
+                            growable: false,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 14),

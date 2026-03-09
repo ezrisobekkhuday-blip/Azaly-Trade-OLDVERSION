@@ -9,6 +9,7 @@ import '../models/product.dart';
 import '../services/api_client.dart';
 import '../state/app_store.dart';
 import '../theme/app_theme.dart';
+import '../utils/image_source_utils.dart';
 import '../widgets/app_background.dart';
 import '../widgets/product_image.dart';
 import '../widgets/product_thumbnail_card.dart';
@@ -78,7 +79,7 @@ class FavoritesScreen extends StatelessWidget {
     final grossTotal = product.grossTotalValue;
     final supplierShare = product.supplierShareValue;
     final files = product.imagePaths
-        .where((path) => !isRemoteImageSource(path) && File(path).existsSync())
+        .where((path) => !isBrowserImageSource(path) && File(path).existsSync())
         .map(XFile.new)
         .toList();
     final remoteImages = product.imagePaths.where(isRemoteImageSource).toList();

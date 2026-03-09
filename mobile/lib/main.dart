@@ -301,6 +301,69 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  Widget _buildWebMobileShell(
+    AppStrings strings,
+    List<_ShellDestination> destinations,
+  ) {
+    return Scaffold(
+      body: AppBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.store.displayName,
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              height: 1.05,
+                            ),
+                      ),
+                    ),
+                    IconButton.filledTonal(
+                      onPressed: _openSettings,
+                      icon: const Icon(Icons.settings_outlined),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: SizedBox.expand(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(30),
+                      child: _activeScreenView(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
+                  child: NavigationBar(
+                    selectedIndex: _selectedIndex,
+                    onDestinationSelected: _selectTab,
+                    destinations: destinations
+                        .map(
+                          (item) => NavigationDestination(
+                            icon: Icon(item.icon),
+                            selectedIcon: Icon(item.selectedIcon),
+                            label: item.label,
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
@@ -315,7 +378,11 @@ class _HomeShellState extends State<HomeShell> {
         }
 
         final useCompactMobileShell = constraints.maxWidth < 720;
-        final useDirectWebMobileRender = kIsWeb && useCompactMobileShell;
+        final useWebMobileShell = kIsWeb && useCompactMobileShell;
+
+        if (useWebMobileShell) {
+          return _buildWebMobileShell(strings, destinations);
+        }
 
         return Scaffold(
           extendBody: true,
@@ -332,9 +399,7 @@ class _HomeShellState extends State<HomeShell> {
               ),
             ],
           ),
-          body: useDirectWebMobileRender
-              ? _activeScreenView()
-              : useCompactMobileShell
+          body: useCompactMobileShell
               ? (widget.store.isReady
                     ? _screenStack()
                     : const AppBackground(

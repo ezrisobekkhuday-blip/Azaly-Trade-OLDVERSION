@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -6,6 +7,8 @@ import '../data/product_presets.dart';
 import '../localization/app_strings.dart';
 import '../models/product.dart';
 import '../theme/app_theme.dart';
+import '../services/web_camera_capture.dart';
+import '../utils/image_source_utils.dart';
 import '../widgets/product_thumbnail_card.dart';
 import '../widgets/suggestion_field.dart';
 
@@ -110,8 +113,13 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
         return;
       }
 
+      final imageSources = await Future.wait(files.map(normalizePickedImageSource));
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
-        _imagePaths.addAll(files.map((file) => file.path));
+        _imagePaths.addAll(imageSources);
       });
     } catch (_) {
       _showMessage(AppStrings.of(context).t('cannotOpenGallery'));
@@ -120,6 +128,19 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
 
   Future<void> _takePhoto() async {
     try {
+      if (kIsWeb) {
+        final imageSource = await captureImageWithWebCamera(context);
+
+        if (!mounted || imageSource == null || imageSource.isEmpty) {
+          return;
+        }
+
+        setState(() {
+          _imagePaths.add(imageSource);
+        });
+        return;
+      }
+
       final file = await _picker.pickImage(
         source: ImageSource.camera,
         imageQuality: _pickedImageQuality,
@@ -131,8 +152,13 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
         return;
       }
 
+      final imageSource = await normalizePickedImageSource(file);
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
-        _imagePaths.add(file.path);
+        _imagePaths.add(imageSource);
       });
     } catch (_) {
       _showMessage(AppStrings.of(context).t('cannotOpenCamera'));

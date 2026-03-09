@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../models/expense.dart';
 import '../models/product.dart';
 import '../models/shop.dart';
+import '../utils/image_source_utils.dart';
 
 class ApiClient {
   ApiClient({http.Client? client})
@@ -84,9 +85,40 @@ class ApiClient {
     }
 
     final request = http.MultipartRequest('POST', _uri('/media/upload'));
+    var index = 0;
 
     for (final imagePath in imagePaths) {
-      request.files.add(await http.MultipartFile.fromPath('files', imagePath));
+      if (isInlineDataImageSource(imagePath)) {
+        final bytes = decodeInlineDataImage(imagePath);
+        if (bytes == null) {
+          throw const ApiException('Cannot read selected image.');
+        }
+
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'files',
+            bytes,
+            filename: suggestedUploadFileName(imagePath, index),
+          ),
+        );
+      } else if (isBrowserObjectImageSource(imagePath)) {
+        final response = await _client.get(Uri.parse(imagePath));
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          throw const ApiException('Cannot read selected image.');
+        }
+
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'files',
+            response.bodyBytes,
+            filename: suggestedUploadFileName(imagePath, index),
+          ),
+        );
+      } else {
+        request.files.add(await http.MultipartFile.fromPath('files', imagePath));
+      }
+
+      index += 1;
     }
 
     final streamedResponse = await _client.send(request);
@@ -371,6 +403,14 @@ class ApiException implements Exception {
 String describeError(Object error, {required String fallbackMessage}) {
   if (error is ApiException && error.message.trim().isNotEmpty) {
     return error.message;
+  }
+
+  final message = error.toString().trim();
+  if (message.isNotEmpty &&
+      message != 'Exception' &&
+      message != 'null' &&
+      !message.startsWith("Instance of '")) {
+    return message;
   }
 
   return fallbackMessage;

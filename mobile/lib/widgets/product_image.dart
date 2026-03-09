@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../utils/image_source_utils.dart';
 
 class ProductImage extends StatelessWidget {
   const ProductImage({
@@ -42,7 +43,27 @@ class ProductImage extends StatelessWidget {
             ? (targetHeight * devicePixelRatio).round()
             : null;
 
-        if (isRemoteImageSource(source)) {
+        if (isInlineDataImageSource(source)) {
+          final bytes = decodeInlineDataImage(source);
+
+          if (bytes == null) {
+            return _ImageFallback(width: width, height: height);
+          }
+
+          return Image.memory(
+            bytes,
+            width: width,
+            height: height,
+            fit: fit,
+            cacheWidth: cacheWidth,
+            cacheHeight: cacheHeight,
+            filterQuality: FilterQuality.low,
+            errorBuilder: (_, _, _) =>
+                _ImageFallback(width: width, height: height),
+          );
+        }
+
+        if (isBrowserImageSource(source)) {
           return Image.network(
             source,
             width: width,
@@ -54,6 +75,10 @@ class ProductImage extends StatelessWidget {
             errorBuilder: (_, _, _) =>
                 _ImageFallback(width: width, height: height),
           );
+        }
+
+        if (source.trim().isEmpty) {
+          return _ImageFallback(width: width, height: height);
         }
 
         return Image.file(
@@ -70,10 +95,6 @@ class ProductImage extends StatelessWidget {
       },
     );
   }
-}
-
-bool isRemoteImageSource(String source) {
-  return source.startsWith('http://') || source.startsWith('https://');
 }
 
 class _ImageFallback extends StatelessWidget {

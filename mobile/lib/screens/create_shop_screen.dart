@@ -11,8 +11,10 @@ import '../localization/app_strings.dart';
 import '../models/map_selection_result.dart';
 import '../models/shop.dart';
 import '../services/api_client.dart';
+import '../services/web_camera_capture.dart';
 import '../state/app_store.dart';
 import '../theme/app_theme.dart';
+import '../utils/image_source_utils.dart';
 import '../widgets/app_background.dart';
 import '../widgets/product_image.dart';
 import '../widgets/product_thumbnail_card.dart';
@@ -22,6 +24,9 @@ import 'location_picker_page.dart';
 
 const double _pickedImageMaxDimension = 1440;
 const int _pickedImageQuality = 70;
+const Duration _webLocationDelay = Duration(milliseconds: 700);
+const Duration _primaryLocationTimeout = Duration(seconds: 18);
+const Duration _fallbackLocationTimeout = Duration(seconds: 10);
 
 class CreateShopScreen extends StatefulWidget {
   const CreateShopScreen({
@@ -61,6 +66,19 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
 
   Future<void> _pickShopPhoto(ImageSource source) async {
     try {
+      if (kIsWeb && source == ImageSource.camera) {
+        final imageSource = await captureImageWithWebCamera(context);
+
+        if (!mounted || imageSource == null || imageSource.isEmpty) {
+          return;
+        }
+
+        setState(() {
+          _shopPhotoPath = imageSource;
+        });
+        return;
+      }
+
       final file = await _picker.pickImage(
         source: source,
         imageQuality: _pickedImageQuality,
@@ -72,8 +90,13 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
         return;
       }
 
+      final imageSource = await normalizePickedImageSource(file);
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
-        _shopPhotoPath = file.path;
+        _shopPhotoPath = imageSource;
       });
     } catch (_) {
       _showMessage(AppStrings.of(context).t('cannotLoadShopPhoto'));
@@ -82,6 +105,19 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
 
   Future<void> _pickBusinessCard(ImageSource source) async {
     try {
+      if (kIsWeb && source == ImageSource.camera) {
+        final imageSource = await captureImageWithWebCamera(context);
+
+        if (!mounted || imageSource == null || imageSource.isEmpty) {
+          return;
+        }
+
+        setState(() {
+          _businessCardPath = imageSource;
+        });
+        return;
+      }
+
       final file = await _picker.pickImage(
         source: source,
         imageQuality: _pickedImageQuality,
@@ -93,8 +129,13 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
         return;
       }
 
+      final imageSource = await normalizePickedImageSource(file);
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
-        _businessCardPath = file.path;
+        _businessCardPath = imageSource;
       });
     } catch (_) {
       _showMessage(AppStrings.of(context).t('cannotLoadBusinessCard'));
@@ -113,9 +154,16 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
         return;
       }
 
+      final imageSources = await Future.wait(
+        files.map(normalizePickedImageSource),
+      );
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _storefrontItems.addAll(
-          files.map((file) => StorefrontItem(imagePath: file.path)),
+          imageSources.map((source) => StorefrontItem(imagePath: source)),
         );
       });
     } catch (_) {
@@ -125,6 +173,19 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
 
   Future<void> _pickStorefrontFromCamera() async {
     try {
+      if (kIsWeb) {
+        final imageSource = await captureImageWithWebCamera(context);
+
+        if (!mounted || imageSource == null || imageSource.isEmpty) {
+          return;
+        }
+
+        setState(() {
+          _storefrontItems.add(StorefrontItem(imagePath: imageSource));
+        });
+        return;
+      }
+
       final file = await _picker.pickImage(
         source: ImageSource.camera,
         imageQuality: _pickedImageQuality,
@@ -136,8 +197,13 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
         return;
       }
 
+      final imageSource = await normalizePickedImageSource(file);
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
-        _storefrontItems.add(StorefrontItem(imagePath: file.path));
+        _storefrontItems.add(StorefrontItem(imagePath: imageSource));
       });
     } catch (_) {
       _showMessage(AppStrings.of(context).t('cannotOpenStorefrontCamera'));
@@ -250,6 +316,50 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
         '${position.longitude.toStringAsFixed(5)}';
   }
 
+  Future<Position?> _resolveCurrentPosition() async {
+    Position? position = await Geolocator.getLastKnownPosition();
+
+    final primarySettings = kIsWeb
+        ? WebSettings(
+            accuracy: LocationAccuracy.best,
+            maximumAge: const Duration(minutes: 3),
+            timeLimit: _primaryLocationTimeout,
+          )
+        : const LocationSettings(
+            accuracy: LocationAccuracy.best,
+            timeLimit: _primaryLocationTimeout,
+          );
+
+    final fallbackSettings = kIsWeb
+        ? WebSettings(
+            accuracy: LocationAccuracy.medium,
+            maximumAge: const Duration(minutes: 10),
+            timeLimit: _fallbackLocationTimeout,
+          )
+        : const LocationSettings(
+            accuracy: LocationAccuracy.low,
+            timeLimit: _fallbackLocationTimeout,
+          );
+
+    for (final settings in [primarySettings, fallbackSettings]) {
+      try {
+        return await Geolocator.getCurrentPosition(locationSettings: settings);
+      } catch (_) {
+        try {
+          return await Geolocator.getPositionStream(locationSettings: settings)
+              .first
+              .timeout(
+                settings.timeLimit ?? _fallbackLocationTimeout,
+              );
+        } catch (_) {
+          // Try next strategy.
+        }
+      }
+    }
+
+    return position ?? await Geolocator.getLastKnownPosition();
+  }
+
   String? _buildPlacemarkLabel(Placemark? place) {
     final locationParts = <String>{
       if (place?.street?.trim().isNotEmpty ?? false) place!.street!.trim(),
@@ -283,7 +393,9 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
       }
 
       var permission = await Geolocator.checkPermission();
+      var permissionRequested = false;
       if (permission == LocationPermission.denied) {
+        permissionRequested = true;
         permission = await Geolocator.requestPermission();
       }
 
@@ -293,18 +405,11 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
         return;
       }
 
-      Position? position = await Geolocator.getLastKnownPosition();
-
-      try {
-        position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.low,
-            timeLimit: Duration(seconds: 5),
-          ),
-        );
-      } on TimeoutException {
-        position ??= await Geolocator.getLastKnownPosition();
+      if (kIsWeb && permissionRequested) {
+        await Future<void>.delayed(_webLocationDelay);
       }
+
+      final position = await _resolveCurrentPosition();
 
       if (position == null) {
         _showMessage(strings.t('cannotGetQuickLocation'));
@@ -486,7 +591,31 @@ class _CreateShopScreenState extends State<CreateShopScreen> {
                         decoration: InputDecoration(
                           labelText: strings.t('shopLocationLabel'),
                           hintText: strings.t('shopLocationHint'),
+                          suffixIcon: IconButton(
+                            onPressed: _isSubmitting || _isResolvingLocation
+                                ? null
+                                : _fillCurrentLocation,
+                            icon: _isResolvingLocation
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.my_location_outlined),
+                          ),
                         ),
+                      ),
+                      const SizedBox(height: 14),
+                      _ShopLocationCard(
+                        latitude: _selectedLatitude,
+                        longitude: _selectedLongitude,
+                        onPickOnMap: _pickLocationOnMap,
+                        onUseCurrentLocation:
+                            _isSubmitting || _isResolvingLocation
+                            ? null
+                            : _fillCurrentLocation,
                       ),
                       const SizedBox(height: 14),
                       TextField(

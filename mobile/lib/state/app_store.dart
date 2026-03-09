@@ -6,6 +6,7 @@ import '../models/expense.dart';
 import '../models/product.dart';
 import '../models/shop.dart';
 import '../services/api_client.dart';
+import '../utils/image_source_utils.dart';
 
 class AppStore extends ChangeNotifier {
   AppStore({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
@@ -420,7 +421,7 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<String> _prepareSingleImage(String imagePath) async {
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    if (isRemoteImageSource(imagePath)) {
       return imagePath;
     }
 
@@ -430,9 +431,7 @@ class AppStore extends ChangeNotifier {
 
   Future<List<String>> _prepareImagePaths(List<String> imagePaths) async {
     final localPaths = imagePaths
-        .where(
-          (path) => !path.startsWith('http://') && !path.startsWith('https://'),
-        )
+        .where((path) => !isRemoteImageSource(path))
         .toList();
 
     if (localPaths.isEmpty) {
@@ -443,7 +442,7 @@ class AppStore extends ChangeNotifier {
     var uploadedIndex = 0;
 
     return imagePaths.map((path) {
-      if (path.startsWith('http://') || path.startsWith('https://')) {
+      if (isRemoteImageSource(path)) {
         return path;
       }
 

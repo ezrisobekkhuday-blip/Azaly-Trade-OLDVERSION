@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geocoding/geocoding.dart';
@@ -9,6 +10,10 @@ import 'package:latlong2/latlong.dart';
 import '../localization/app_strings.dart';
 import '../models/map_selection_result.dart';
 import '../theme/app_theme.dart';
+
+const Duration _webLocationDelay = Duration(milliseconds: 700);
+const Duration _primaryLocationTimeout = Duration(seconds: 18);
+const Duration _fallbackLocationTimeout = Duration(seconds: 10);
 
 class LocationPickerPage extends StatefulWidget {
   const LocationPickerPage({
@@ -56,7 +61,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       }
 
       var permission = await Geolocator.checkPermission();
+      var permissionRequested = false;
       if (permission == LocationPermission.denied) {
+        permissionRequested = true;
         permission = await Geolocator.requestPermission();
       }
 
@@ -66,18 +73,11 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         return;
       }
 
-      Position? position = await Geolocator.getLastKnownPosition();
-
-      try {
-        position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.low,
-            timeLimit: Duration(seconds: 5),
-          ),
-        );
-      } on TimeoutException {
-        position ??= await Geolocator.getLastKnownPosition();
+      if (kIsWeb && permissionRequested) {
+        await Future<void>.delayed(_webLocationDelay);
       }
+
+      final position = await _resolveCurrentPosition();
 
       if (position == null) {
         _showMessage(strings.t('cannotGetCurrentPoint'));
@@ -161,6 +161,48 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<Position?> _resolveCurrentPosition() async {
+    Position? position = await Geolocator.getLastKnownPosition();
+
+    final primarySettings = kIsWeb
+        ? WebSettings(
+            accuracy: LocationAccuracy.best,
+            maximumAge: const Duration(minutes: 3),
+            timeLimit: _primaryLocationTimeout,
+          )
+        : const LocationSettings(
+            accuracy: LocationAccuracy.best,
+            timeLimit: _primaryLocationTimeout,
+          );
+
+    final fallbackSettings = kIsWeb
+        ? WebSettings(
+            accuracy: LocationAccuracy.medium,
+            maximumAge: const Duration(minutes: 10),
+            timeLimit: _fallbackLocationTimeout,
+          )
+        : const LocationSettings(
+            accuracy: LocationAccuracy.low,
+            timeLimit: _fallbackLocationTimeout,
+          );
+
+    for (final settings in [primarySettings, fallbackSettings]) {
+      try {
+        return await Geolocator.getCurrentPosition(locationSettings: settings);
+      } catch (_) {
+        try {
+          return await Geolocator.getPositionStream(locationSettings: settings)
+              .first
+              .timeout(settings.timeLimit ?? _fallbackLocationTimeout);
+        } catch (_) {
+          // Try next strategy.
+        }
+      }
+    }
+
+    return position ?? await Geolocator.getLastKnownPosition();
   }
 
   @override
