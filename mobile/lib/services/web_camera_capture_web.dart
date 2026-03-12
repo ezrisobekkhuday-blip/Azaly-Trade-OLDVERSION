@@ -15,20 +15,40 @@ const int _captureMaxDimension = 1440;
 Future<String?> captureImageWithWebCamera(
   BuildContext context, {
   bool preferRearCamera = true,
+  int? maxDimension,
+  bool preferPng = false,
+  int idealWidth = 1280,
+  int idealHeight = 720,
 }) {
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _WebCameraCaptureSheet(preferRearCamera: preferRearCamera),
+    builder: (_) => _WebCameraCaptureSheet(
+      preferRearCamera: preferRearCamera,
+      maxDimension: maxDimension,
+      preferPng: preferPng,
+      idealWidth: idealWidth,
+      idealHeight: idealHeight,
+    ),
   );
 }
 
 class _WebCameraCaptureSheet extends StatefulWidget {
-  const _WebCameraCaptureSheet({required this.preferRearCamera});
+  const _WebCameraCaptureSheet({
+    required this.preferRearCamera,
+    required this.maxDimension,
+    required this.preferPng,
+    required this.idealWidth,
+    required this.idealHeight,
+  });
 
   final bool preferRearCamera;
+  final int? maxDimension;
+  final bool preferPng;
+  final int idealWidth;
+  final int idealHeight;
 
   @override
   State<_WebCameraCaptureSheet> createState() => _WebCameraCaptureSheetState();
@@ -78,8 +98,8 @@ class _WebCameraCaptureSheetState extends State<_WebCameraCaptureSheet> {
         stream = await mediaDevices.getUserMedia({
           'video': {
             'facingMode': preferredFacingMode,
-            'width': {'ideal': 1280},
-            'height': {'ideal': 720},
+            'width': {'ideal': widget.idealWidth},
+            'height': {'ideal': widget.idealHeight},
           },
           'audio': false,
         });
@@ -135,8 +155,9 @@ class _WebCameraCaptureSheetState extends State<_WebCameraCaptureSheet> {
 
     try {
       final longestSide = width > height ? width : height;
-      final scale = longestSide > _captureMaxDimension
-          ? _captureMaxDimension / longestSide
+      final maxDimension = widget.maxDimension ?? _captureMaxDimension;
+      final scale = longestSide > maxDimension
+          ? maxDimension / longestSide
           : 1.0;
       final targetWidth = (width * scale).round();
       final targetHeight = (height * scale).round();
@@ -152,7 +173,9 @@ class _WebCameraCaptureSheetState extends State<_WebCameraCaptureSheet> {
         targetWidth.toDouble(),
         targetHeight.toDouble(),
       );
-      final dataUrl = canvas.toDataUrl('image/jpeg', 0.88);
+      final dataUrl = widget.preferPng
+          ? canvas.toDataUrl('image/png')
+          : canvas.toDataUrl('image/jpeg', 0.88);
 
       if (!mounted) {
         return;

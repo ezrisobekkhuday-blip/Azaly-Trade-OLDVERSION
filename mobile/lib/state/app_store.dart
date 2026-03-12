@@ -181,6 +181,8 @@ class AppStore extends ChangeNotifier {
     required double? longitude,
     required String description,
     required String businessCardPath,
+    required String sellerWechat,
+    required String sellerWechatLink,
   }) async {
     final photo = await _prepareSingleImage(photoPath);
     final preparedStorefrontItems = await _prepareStorefrontItems(
@@ -199,6 +201,8 @@ class AppStore extends ChangeNotifier {
       description: description.trim(),
       storefrontItems: preparedStorefrontItems,
       businessCardImage: businessCard,
+      sellerWechat: sellerWechat.trim(),
+      sellerWechatLink: sellerWechatLink.trim(),
     );
     final createdShop = serverShop.copyWith(
       photo: serverShop.photo.isEmpty ? photo : serverShop.photo,
@@ -214,6 +218,12 @@ class AppStore extends ChangeNotifier {
       businessCardImage: serverShop.businessCardImage.isEmpty
           ? businessCard
           : serverShop.businessCardImage,
+      sellerWechat: serverShop.sellerWechat.isEmpty
+          ? sellerWechat.trim()
+          : serverShop.sellerWechat,
+      sellerWechatLink: serverShop.sellerWechatLink.isEmpty
+          ? sellerWechatLink.trim()
+          : serverShop.sellerWechatLink,
     );
 
     _shops.insert(0, createdShop);
@@ -242,6 +252,12 @@ class AppStore extends ChangeNotifier {
       location: serverShop.location.isEmpty
           ? preparedShop.location
           : serverShop.location,
+      sellerWechat: serverShop.sellerWechat.isEmpty
+          ? preparedShop.sellerWechat
+          : serverShop.sellerWechat,
+      sellerWechatLink: serverShop.sellerWechatLink.isEmpty
+          ? preparedShop.sellerWechatLink
+          : serverShop.sellerWechatLink,
       storefrontItems: _mergeStorefrontItems(
         preparedShop.storefrontItems,
         serverShop.storefrontItems,
@@ -282,21 +298,25 @@ class AppStore extends ChangeNotifier {
   Future<void> createProduct({
     required String shopId,
     required List<String> imagePaths,
+    required String article,
     required String amount,
     required int quantity,
     required String color,
     required String material,
     required String size,
+    required String measurements,
   }) async {
     final preparedImages = await _prepareImagePaths(imagePaths);
     final createdProduct = await _apiClient.createProduct(
       shopId: shopId,
       images: preparedImages,
+      article: article.trim(),
       amount: amount.trim(),
       quantity: quantity < 1 ? 1 : quantity,
       color: color.trim(),
       material: material.trim(),
       size: size.trim(),
+      measurements: measurements.trim(),
     );
 
     _products.insert(0, createdProduct);
@@ -500,6 +520,9 @@ class AppStore extends ChangeNotifier {
             ? localItem.material
             : serverItem.material,
         size: serverItem.size.trim().isEmpty ? localItem.size : serverItem.size,
+        measurements: serverItem.measurements.trim().isEmpty
+            ? localItem.measurements
+            : serverItem.measurements,
         isFavorite: localItem.isFavorite,
       );
     }, growable: false);

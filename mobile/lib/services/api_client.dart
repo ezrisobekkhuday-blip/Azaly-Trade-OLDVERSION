@@ -141,6 +141,8 @@ class ApiClient {
     required String description,
     required List<StorefrontItem> storefrontItems,
     required String businessCardImage,
+    required String sellerWechat,
+    required String sellerWechatLink,
   }) async {
     final storefrontImages = storefrontItems
         .map((item) => item.imagePath)
@@ -164,6 +166,8 @@ class ApiClient {
             ? ''
             : storefrontImages.first,
         'business_card_image': businessCardImage,
+        'seller_wechat': sellerWechat,
+        'seller_wechat_link': sellerWechatLink,
       }),
     );
 
@@ -199,6 +203,8 @@ class ApiClient {
             ? ''
             : storefrontImages.first,
         'business_card_image': shop.businessCardImage,
+        'seller_wechat': shop.sellerWechat,
+        'seller_wechat_link': shop.sellerWechatLink,
       }),
     );
 
@@ -222,11 +228,13 @@ class ApiClient {
   Future<Product> createProduct({
     required String shopId,
     required List<String> images,
+    required String article,
     required String amount,
     required int quantity,
     required String color,
     required String material,
     required String size,
+    required String measurements,
     bool isFavorite = false,
   }) async {
     final response = await _client.post(
@@ -235,11 +243,13 @@ class ApiClient {
       body: jsonEncode({
         'shop_id': int.parse(shopId),
         'images': images,
+        'article': article,
         'amount': amount,
         'quantity': quantity,
         'color': color,
         'material': material,
         'size': size,
+        'measurements': measurements,
         'is_favorite': isFavorite,
       }),
     );
@@ -260,11 +270,13 @@ class ApiClient {
       body: jsonEncode({
         'shop_id': int.parse(product.shopId),
         'images': product.imagePaths,
+        'article': product.article,
         'amount': product.amount,
         'quantity': product.quantity,
         'color': product.color,
         'material': product.material,
         'size': product.size,
+        'measurements': product.measurements,
         'is_favorite': product.isFavorite,
       }),
     );

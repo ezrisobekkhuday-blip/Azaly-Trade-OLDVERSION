@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -240,6 +239,30 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  Widget _nativeScreenBody({required bool compact}) {
+    if (!widget.store.isReady) {
+      return const AppBackground(
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (compact) {
+      return _activeScreenView();
+    }
+
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SizedBox(
+        width: double.infinity,
+        height: double.infinity,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _tabletContentMaxWidth),
+          child: _activeScreenView(),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDesktopShell(
     AppStrings strings,
     List<_ShellDestination> destinations,
@@ -301,15 +324,26 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
-  Widget _buildWebMobileShell(
+  Widget _buildCompactShell(
     AppStrings strings,
     List<_ShellDestination> destinations,
   ) {
+    final mediaQuery = MediaQuery.of(context);
+    final topInset = mediaQuery.viewPadding.top;
+    final bottomInset = mediaQuery.viewPadding.bottom;
+
     return Scaffold(
       body: AppBackground(
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            topInset + 14,
+            16,
+            bottomInset + 6,
+          ),
+          child: SafeArea(
+            top: false,
+            bottom: false,
             child: Column(
               children: [
                 Row(
@@ -324,9 +358,19 @@ class _HomeShellState extends State<HomeShell> {
                             ),
                       ),
                     ),
-                    IconButton.filledTonal(
-                      onPressed: _openSettings,
-                      icon: const Icon(Icons.settings_outlined),
+                    Container(
+                      margin: const EdgeInsets.only(left: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: IconButton.filledTonal(
+                        onPressed: _openSettings,
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(56, 56),
+                          padding: const EdgeInsets.all(14),
+                        ),
+                        icon: const Icon(Icons.settings_outlined),
+                      ),
                     ),
                   ],
                 ),
@@ -339,21 +383,32 @@ class _HomeShellState extends State<HomeShell> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(28),
-                  child: NavigationBar(
-                    selectedIndex: _selectedIndex,
-                    onDestinationSelected: _selectTab,
-                    destinations: destinations
-                        .map(
-                          (item) => NavigationDestination(
-                            icon: Icon(item.icon),
-                            selectedIcon: Icon(item.selectedIcon),
-                            label: item.label,
-                          ),
-                        )
-                        .toList(growable: false),
+                  borderRadius: BorderRadius.circular(24),
+                  child: NavigationBarTheme(
+                    data: NavigationBarThemeData(
+                      height: 62,
+                      labelTextStyle: WidgetStateProperty.all(
+                        Theme.of(context).textTheme.labelSmall?.copyWith(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    child: NavigationBar(
+                      selectedIndex: _selectedIndex,
+                      onDestinationSelected: _selectTab,
+                      destinations: destinations
+                          .map(
+                            (item) => NavigationDestination(
+                              icon: Icon(item.icon),
+                              selectedIcon: Icon(item.selectedIcon),
+                              label: item.label,
+                            ),
+                          )
+                          .toList(growable: false),
+                    ),
                   ),
                 ),
               ],
@@ -378,10 +433,9 @@ class _HomeShellState extends State<HomeShell> {
         }
 
         final useCompactMobileShell = constraints.maxWidth < 720;
-        final useWebMobileShell = kIsWeb && useCompactMobileShell;
 
-        if (useWebMobileShell) {
-          return _buildWebMobileShell(strings, destinations);
+        if (useCompactMobileShell) {
+          return _buildCompactShell(strings, destinations);
         }
 
         return Scaffold(
@@ -397,31 +451,9 @@ class _HomeShellState extends State<HomeShell> {
                   icon: const Icon(Icons.settings_outlined),
                 ),
               ),
-            ],
+              ],
           ),
-          body: useCompactMobileShell
-              ? (widget.store.isReady
-                    ? _screenStack()
-                    : const AppBackground(
-                        child: Center(child: CircularProgressIndicator()),
-                      ))
-              : Align(
-                  alignment: Alignment.topCenter,
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: double.infinity,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        maxWidth: _tabletContentMaxWidth,
-                      ),
-                      child: widget.store.isReady
-                          ? _screenStack()
-                          : const AppBackground(
-                              child: Center(child: CircularProgressIndicator()),
-                            ),
-                    ),
-                  ),
-                ),
+          body: _nativeScreenBody(compact: useCompactMobileShell),
           bottomNavigationBar: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 920),

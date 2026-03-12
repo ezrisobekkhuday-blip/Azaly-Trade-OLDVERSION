@@ -26,10 +26,12 @@ class ProductEditorSheet extends StatefulWidget {
 
 class _ProductEditorSheetState extends State<ProductEditorSheet> {
   final ImagePicker _picker = ImagePicker();
+  late final TextEditingController _articleController;
   late final TextEditingController _amountController;
   late final TextEditingController _colorController;
   late final TextEditingController _materialController;
   late final TextEditingController _sizeController;
+  late final TextEditingController _measurementsController;
   late final TextEditingController _quantityController;
   late final List<String> _imagePaths;
   late int _quantity;
@@ -38,10 +40,14 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
   @override
   void initState() {
     super.initState();
+    _articleController = TextEditingController(text: widget.product.article);
     _amountController = TextEditingController(text: widget.product.amount);
     _colorController = TextEditingController(text: widget.product.color);
     _materialController = TextEditingController(text: widget.product.material);
     _sizeController = TextEditingController(text: widget.product.size);
+    _measurementsController = TextEditingController(
+      text: widget.product.measurements,
+    );
     _quantity = widget.product.quantity < 1 ? 1 : widget.product.quantity;
     _quantityController = TextEditingController(text: '$_quantity');
     _imagePaths = List<String>.from(widget.product.imagePaths);
@@ -49,10 +55,12 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
 
   @override
   void dispose() {
+    _articleController.dispose();
     _amountController.dispose();
     _colorController.dispose();
     _materialController.dispose();
     _sizeController.dispose();
+    _measurementsController.dispose();
     _quantityController.dispose();
     super.dispose();
   }
@@ -180,11 +188,13 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
     Navigator.of(context).pop(
       widget.product.copyWith(
         imagePaths: List<String>.from(_imagePaths),
+        article: _articleController.text.trim(),
         amount: _amountController.text.trim(),
         quantity: _quantity,
         color: _colorController.text.trim(),
         material: _materialController.text.trim(),
         size: _sizeController.text.trim(),
+        measurements: _measurementsController.text.trim(),
       ),
     );
   }
@@ -293,6 +303,14 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
                 ),
                 const SizedBox(height: 14),
                 TextField(
+                  controller: _articleController,
+                  decoration: InputDecoration(
+                    labelText: strings.t('articleLabel'),
+                    hintText: strings.t('articleHint'),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
                   controller: _amountController,
                   onChanged: (_) => setState(() {}),
                   keyboardType: const TextInputType.numberWithOptions(
@@ -357,6 +375,16 @@ class _ProductEditorSheetState extends State<ProductEditorSheet> {
                     ),
                   ],
                   allowMultiSelect: true,
+                  collapsibleSuggestions: true,
+                  initiallyExpanded: false,
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _measurementsController,
+                  decoration: InputDecoration(
+                    labelText: strings.t('measurementsLabel'),
+                    hintText: strings.t('measurementsHint'),
+                  ),
                 ),
                 const SizedBox(height: 18),
                 SizedBox(

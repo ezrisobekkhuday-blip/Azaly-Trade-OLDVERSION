@@ -85,6 +85,7 @@ class FavoritesScreen extends StatelessWidget {
     final remoteImages = product.imagePaths.where(isRemoteImageSource).toList();
     final summary = [
       strings.t('shareSummaryTitle'),
+      '${strings.t('articleLabel')}: ${product.article.isEmpty ? strings.t('notSpecified') : product.article}',
       '${strings.t('purchasePriceLabel')}: ${product.amount.isEmpty ? strings.t('notSpecified') : product.amount}',
       '${strings.t('quantityLabel')}: ${product.quantity}',
       '${strings.t('grossTotalLabel')}: ${grossTotal == null ? strings.t('notSpecified') : formatProductMoney(grossTotal)}',
@@ -93,6 +94,7 @@ class FavoritesScreen extends StatelessWidget {
       '${strings.t('colorLabel')}: ${product.color.isEmpty ? strings.t('notSpecified') : localizeColorValue(language, product.color)}',
       '${strings.t('materialLabel')}: ${product.material.isEmpty ? strings.t('notSpecified') : localizeMaterialValue(language, product.material)}',
       '${strings.t('sizeLabel')}: ${product.size.isEmpty ? strings.t('notSpecified') : localizeSizeValue(language, product.size)}',
+      '${strings.t('measurementsLabel')}: ${product.measurements.isEmpty ? strings.t('notSpecified') : product.measurements}',
       '${strings.t('statusLabel')}: ${strings.localizeStatus(product.status)}',
       if (remoteImages.isNotEmpty) ...[
         '${strings.t('photosLabel')}:',
@@ -374,6 +376,12 @@ class _FavoriteCard extends StatelessWidget {
             runSpacing: 10,
             children: [
               _InfoTile(
+                label: strings.t('articleLabel'),
+                value: product.article.isEmpty
+                    ? strings.t('notSpecified')
+                    : product.article,
+              ),
+              _InfoTile(
                 label: strings.t('priceLabel'),
                 value: product.amount.isEmpty
                     ? strings.t('notSpecified')
@@ -407,6 +415,11 @@ class _FavoriteCard extends StatelessWidget {
                     ? strings.t('notSpecified')
                     : localizeSizeValue(language, product.size),
               ),
+              if (product.measurements.trim().isNotEmpty)
+                _InfoTile(
+                  label: strings.t('measurementsLabel'),
+                  value: product.measurements.trim(),
+                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -612,6 +625,13 @@ class _FavoriteStorefrontCard extends StatelessWidget {
               ),
             ],
           ),
+          if (item.measurements.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _FavoriteStorefrontInfoTile(
+              label: strings.t('measurementsLabel'),
+              value: item.measurements.trim(),
+            ),
+          ],
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,

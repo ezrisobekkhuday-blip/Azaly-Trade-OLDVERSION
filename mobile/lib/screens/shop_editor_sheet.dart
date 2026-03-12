@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../localization/app_strings.dart';
 import '../models/map_selection_result.dart';
@@ -8,10 +10,12 @@ import '../models/shop.dart';
 import '../services/web_camera_capture.dart';
 import '../theme/app_theme.dart';
 import '../utils/image_source_utils.dart';
+import '../utils/wechat_utils.dart';
 import '../widgets/product_image.dart';
 import '../widgets/shop_map_preview.dart';
 import '../widgets/storefront_item_widgets.dart';
 import 'location_picker_page.dart';
+import 'wechat_scanner_sheet.dart';
 
 const double _pickedImageMaxDimension = 1440;
 const int _pickedImageQuality = 70;
@@ -30,7 +34,9 @@ class _ShopEditorSheetState extends State<ShopEditorSheet> {
   late final TextEditingController _nameController;
   late final TextEditingController _locationController;
   late final TextEditingController _descriptionController;
+  late final TextEditingController _sellerWechatController;
   late final List<StorefrontItem> _storefrontItems;
+  late String _sellerWechatLink;
   double? _latitude;
   double? _longitude;
 
@@ -42,7 +48,14 @@ class _ShopEditorSheetState extends State<ShopEditorSheet> {
     _descriptionController = TextEditingController(
       text: widget.shop.description,
     );
+    _sellerWechatController = TextEditingController(
+      text: resolveWechatDisplayValue(
+        widget.shop.sellerWechat,
+        widget.shop.sellerWechatLink,
+      ),
+    );
     _storefrontItems = List<StorefrontItem>.from(widget.shop.storefrontItems);
+    _sellerWechatLink = widget.shop.sellerWechatLink;
     _latitude = widget.shop.latitude;
     _longitude = widget.shop.longitude;
   }
@@ -52,6 +65,7 @@ class _ShopEditorSheetState extends State<ShopEditorSheet> {
     _nameController.dispose();
     _locationController.dispose();
     _descriptionController.dispose();
+    _sellerWechatController.dispose();
     super.dispose();
   }
 
@@ -176,6 +190,56 @@ class _ShopEditorSheetState extends State<ShopEditorSheet> {
     });
   }
 
+  Future<void> _scanWechatSeller() async {
+    final scannedValue = await openWechatScannerSheet(context);
+
+    if (!mounted || scannedValue == null || scannedValue.trim().isEmpty) {
+      return;
+    }
+
+    final normalizedValue = normalizeWechatValue(scannedValue);
+    setState(() {
+      _sellerWechatController.value = TextEditingValue(
+        text: normalizedValue,
+        selection: TextSelection.collapsed(offset: normalizedValue.length),
+      );
+      _sellerWechatLink = deriveWechatLink(normalizedValue);
+    });
+  }
+
+  Future<void> _openWechatSeller() async {
+    final strings = AppStrings.of(context);
+    final launchTarget = _sellerWechatLink.trim();
+
+    if (launchTarget.isNotEmpty) {
+      final uri = Uri.tryParse(launchTarget);
+      if (uri != null &&
+          await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        return;
+      }
+    }
+
+    final rawValue = _sellerWechatController.text.trim();
+    if (!mounted) {
+      return;
+    }
+    if (rawValue.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(strings.t('sellerWechatEmpty'))));
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: rawValue));
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(strings.t('wechatCopied'))));
+  }
+
   void _save() {
     Navigator.of(context).pop(
       widget.shop.copyWith(
@@ -185,6 +249,8 @@ class _ShopEditorSheetState extends State<ShopEditorSheet> {
         longitude: _longitude,
         description: _descriptionController.text.trim(),
         storefrontItems: _storefrontItems,
+        sellerWechat: _sellerWechatController.text.trim(),
+        sellerWechatLink: _sellerWechatLink.trim(),
       ),
     );
   }
@@ -285,6 +351,63 @@ class _ShopEditorSheetState extends State<ShopEditorSheet> {
                   decoration: InputDecoration(
                     labelText: strings.t('extraDescriptionLabel'),
                     hintText: strings.t('shortShopDescriptionHint'),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        strings.t('sellerWechatLabel'),
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _sellerWechatController,
+                        onChanged: (value) {
+                          setState(() {
+                            _sellerWechatLink = deriveWechatLink(value);
+                          });
+                        },
+                        decoration: InputDecoration(
+                          labelText: strings.t('sellerWechatLabel'),
+                          hintText: strings.t('sellerWechatHint'),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed: _scanWechatSeller,
+                              icon: const Icon(Icons.qr_code_scanner_rounded),
+                              label: Text(strings.t('scanWechat')),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed:
+                                  (_sellerWechatController.text.trim().isEmpty &&
+                                      _sellerWechatLink.trim().isEmpty)
+                                  ? null
+                                  : _openWechatSeller,
+                              icon: const Icon(Icons.open_in_new_rounded),
+                              label: Text(strings.t('openWechat')),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 14),

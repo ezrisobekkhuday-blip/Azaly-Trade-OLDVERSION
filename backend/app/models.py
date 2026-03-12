@@ -27,6 +27,8 @@ class Shop(Base):
     storefront_images: Mapped[list[str]] = mapped_column(JSON, default=list)
     storefront_image: Mapped[str] = mapped_column(String(255), default="")
     business_card_image: Mapped[str] = mapped_column(String(255), default="")
+    seller_wechat: Mapped[str] = mapped_column(String(255), default="")
+    seller_wechat_link: Mapped[str] = mapped_column(String(1024), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -36,11 +38,13 @@ class Product(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     shop_id: Mapped[int | None] = mapped_column(ForeignKey("shops.id"), nullable=True)
     images: Mapped[list[str]] = mapped_column(JSON, default=list)
+    article: Mapped[str] = mapped_column(String(120), default="")
     amount: Mapped[str] = mapped_column(String(120), default="")
     quantity: Mapped[int] = mapped_column(default=1)
     color: Mapped[str] = mapped_column(String(80), default="")
     material: Mapped[str] = mapped_column(String(120), default="")
     size: Mapped[str] = mapped_column(String(120), default="")
+    measurements: Mapped[str] = mapped_column(String(160), default="")
     status: Mapped[str] = mapped_column(String(32), default="new")
     is_favorite: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

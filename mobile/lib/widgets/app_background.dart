@@ -9,46 +9,49 @@ class AppBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 1100;
+    return SizedBox.expand(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= 1100;
 
-        return DecoratedBox(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppColors.background,
-                AppColors.backgroundSecondary,
-                Color(0xFF02040B),
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+          return DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.background,
+                  AppColors.backgroundSecondary,
+                  Color(0xFF02040B),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
             ),
-          ),
-          child: Stack(
-            children: [
-              if (isWide) ...const [
-                _BackgroundGlow(
-                  alignment: Alignment.topLeft,
-                  size: 420,
-                  color: Color(0x185FE0B8),
-                ),
-                _BackgroundGlow(
-                  alignment: Alignment.topRight,
-                  size: 460,
-                  color: Color(0x147C92FF),
-                ),
-                _BackgroundGlow(
-                  alignment: Alignment.bottomCenter,
-                  size: 520,
-                  color: Color(0x12FFFFFF),
-                ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (isWide) ...const [
+                  _BackgroundGlow(
+                    alignment: Alignment.topLeft,
+                    size: 420,
+                    color: Color(0x185FE0B8),
+                  ),
+                  _BackgroundGlow(
+                    alignment: Alignment.topRight,
+                    size: 460,
+                    color: Color(0x147C92FF),
+                  ),
+                  _BackgroundGlow(
+                    alignment: Alignment.bottomCenter,
+                    size: 520,
+                    color: Color(0x12FFFFFF),
+                  ),
+                ],
+                child,
               ],
-              child,
-            ],
-          ),
-        );
-      },
+            ),
+          );
+        },
+      ),
     );
   }
 }

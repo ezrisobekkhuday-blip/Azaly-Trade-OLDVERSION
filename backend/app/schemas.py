@@ -23,6 +23,7 @@ class StorefrontItemPayload(BaseModel):
     color: str = ""
     material: str = ""
     size: str = ""
+    measurements: str = ""
     is_favorite: bool = False
 
 
@@ -37,6 +38,8 @@ class ShopCreate(BaseModel):
     storefront_images: list[str] = Field(default_factory=list)
     storefront_image: str = ""
     business_card_image: str = ""
+    seller_wechat: str = ""
+    seller_wechat_link: str = ""
 
 
 class ShopUpdate(BaseModel):
@@ -50,6 +53,8 @@ class ShopUpdate(BaseModel):
     storefront_images: list[str] = Field(default_factory=list)
     storefront_image: str = ""
     business_card_image: str = ""
+    seller_wechat: str = ""
+    seller_wechat_link: str = ""
 
 
 class ShopRead(BaseModel):
@@ -64,6 +69,8 @@ class ShopRead(BaseModel):
     storefront_images: list[str]
     storefront_image: str
     business_card_image: str
+    seller_wechat: str
+    seller_wechat_link: str
     products_count: int
     created_at: datetime
 
@@ -71,22 +78,26 @@ class ShopRead(BaseModel):
 class ProductCreate(BaseModel):
     shop_id: int
     images: list[str] = Field(default_factory=list)
+    article: str = ""
     amount: str = ""
     quantity: int = Field(default=1, ge=1)
     color: str = ""
     material: str = ""
     size: str = ""
+    measurements: str = ""
     is_favorite: bool = False
 
 
 class ProductUpdate(BaseModel):
     shop_id: int
     images: list[str] = Field(default_factory=list)
+    article: str = ""
     amount: str = ""
     quantity: int = Field(default=1, ge=1)
     color: str = ""
     material: str = ""
     size: str = ""
+    measurements: str = ""
     is_favorite: bool = False
 
 
@@ -95,11 +106,13 @@ class ProductRead(BaseModel):
     shop_id: str
     shop_name: str
     images: list[str]
+    article: str
     amount: str
     quantity: int
     color: str
     material: str
     size: str
+    measurements: str
     status: str
     is_favorite: bool
     created_at: datetime

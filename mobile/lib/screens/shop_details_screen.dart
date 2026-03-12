@@ -13,6 +13,7 @@ import '../services/web_camera_capture.dart';
 import '../state/app_store.dart';
 import '../theme/app_theme.dart';
 import '../utils/image_source_utils.dart';
+import '../utils/wechat_utils.dart';
 import '../widgets/app_background.dart';
 import '../widgets/product_image.dart';
 import '../widgets/product_thumbnail_card.dart';
@@ -43,10 +44,12 @@ class ShopDetailsScreen extends StatefulWidget {
 
 class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
   final ImagePicker _picker = ImagePicker();
+  final TextEditingController _articleController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _colorController = TextEditingController();
   final TextEditingController _materialController = TextEditingController();
   final TextEditingController _sizeController = TextEditingController();
+  final TextEditingController _measurementsController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController(
     text: '1',
   );
@@ -67,10 +70,12 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
 
   @override
   void dispose() {
+    _articleController.dispose();
     _amountController.dispose();
     _colorController.dispose();
     _materialController.dispose();
     _sizeController.dispose();
+    _measurementsController.dispose();
     _quantityController.dispose();
     super.dispose();
   }
@@ -94,10 +99,12 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     _imagePaths
       ..clear()
       ..add(item.imagePath);
+    _articleController.clear();
     _amountController.text = item.amount;
     _colorController.text = item.color;
     _materialController.text = item.material;
     _sizeController.text = item.size;
+    _measurementsController.text = item.measurements;
     _quantity = 1;
     _quantityController.text = '1';
     _isPurchaseFormExpanded = true;
@@ -212,11 +219,13 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
       await widget.store.createProduct(
         shopId: shop.id,
         imagePaths: _imagePaths,
+        article: _articleController.text,
         amount: _amountController.text,
         quantity: _quantity,
         color: _colorController.text,
         material: _materialController.text,
         size: _sizeController.text,
+        measurements: _measurementsController.text,
       );
 
       final storefrontImagePath = _pendingStorefrontImagePath;
@@ -240,10 +249,12 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         return;
       }
 
+      _articleController.clear();
       _amountController.clear();
       _colorController.clear();
       _materialController.clear();
       _sizeController.clear();
+      _measurementsController.clear();
       setState(() {
         _imagePaths.clear();
         _quantity = 1;
@@ -551,6 +562,14 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                 ),
                 const SizedBox(height: 14),
                 TextField(
+                  controller: _articleController,
+                  decoration: InputDecoration(
+                    labelText: strings.t('articleLabel'),
+                    hintText: strings.t('articleHint'),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
                   controller: _amountController,
                   onChanged: (_) => setState(() {}),
                   keyboardType: const TextInputType.numberWithOptions(
@@ -617,6 +636,16 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                     ),
                   ],
                   allowMultiSelect: true,
+                  collapsibleSuggestions: true,
+                  initiallyExpanded: false,
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _measurementsController,
+                  decoration: InputDecoration(
+                    labelText: strings.t('measurementsLabel'),
+                    hintText: strings.t('measurementsHint'),
+                  ),
                 ),
                 const SizedBox(height: 18),
                 FilledButton(
@@ -766,6 +795,42 @@ class _ShopHero extends StatelessWidget {
         context,
       ).showSnackBar(SnackBar(content: Text(strings.t('cannotOpenRoute'))));
     }
+  }
+
+  Future<void> _openWechatSeller(BuildContext context) async {
+    final strings = AppStrings.of(context);
+    final launchTarget = shop.sellerWechatLink.trim();
+
+    if (launchTarget.isNotEmpty) {
+      final uri = Uri.tryParse(launchTarget);
+      if (uri != null &&
+          await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        return;
+      }
+    }
+
+    final rawValue = resolveWechatDisplayValue(
+      shop.sellerWechat,
+      shop.sellerWechatLink,
+    ).trim();
+    if (!context.mounted) {
+      return;
+    }
+    if (rawValue.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(strings.t('sellerWechatEmpty'))));
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: rawValue));
+    if (!context.mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(strings.t('wechatCopied'))));
   }
 
   @override
@@ -941,6 +1006,13 @@ class _ShopHero extends StatelessWidget {
                                 ? strings.t('notSpecified')
                                 : localizeSizeValue(language, item.size),
                           ),
+                          if (item.measurements.trim().isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            _StorefrontMetaLine(
+                              label: strings.t('measurementsLabel'),
+                              value: item.measurements.trim(),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -972,6 +1044,13 @@ class _ShopHero extends StatelessWidget {
             runSpacing: 10,
             children: [
               _Pill(label: strings.formatShopItemCount(shop.productsCount)),
+              if (shop.sellerWechat.trim().isNotEmpty ||
+                  shop.sellerWechatLink.trim().isNotEmpty)
+                FilledButton.tonalIcon(
+                  onPressed: () => _openWechatSeller(context),
+                  icon: const Icon(Icons.chat_bubble_outline_rounded),
+                  label: Text(strings.t('openWechat')),
+                ),
               if (shop.businessCardImage.isNotEmpty)
                 FilledButton.tonalIcon(
                   onPressed: onOpenCard,
@@ -1108,6 +1187,12 @@ class _ShopProductCard extends StatelessWidget {
             runSpacing: 10,
             children: [
               _MiniInfo(
+                label: strings.t('articleLabel'),
+                value: product.article.trim().isEmpty
+                    ? strings.t('notSpecified')
+                    : product.article.trim(),
+              ),
+              _MiniInfo(
                 label: strings.t('priceLabel'),
                 value: product.amount.isEmpty
                     ? strings.t('notSpecified')
@@ -1141,6 +1226,11 @@ class _ShopProductCard extends StatelessWidget {
                     ? strings.t('notSpecified')
                     : localizeSizeValue(language, product.size),
               ),
+              if (product.measurements.trim().isNotEmpty)
+                _MiniInfo(
+                  label: strings.t('measurementsLabel'),
+                  value: product.measurements.trim(),
+                ),
             ],
           ),
           const SizedBox(height: 16),

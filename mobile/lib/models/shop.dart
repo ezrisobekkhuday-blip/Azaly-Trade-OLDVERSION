@@ -5,6 +5,7 @@ class StorefrontItem {
     this.color = '',
     this.material = '',
     this.size = '',
+    this.measurements = '',
     this.isFavorite = false,
   });
 
@@ -13,13 +14,15 @@ class StorefrontItem {
   final String color;
   final String material;
   final String size;
+  final String measurements;
   final bool isFavorite;
 
   bool get hasDetails =>
       amount.trim().isNotEmpty ||
       color.trim().isNotEmpty ||
       material.trim().isNotEmpty ||
-      size.trim().isNotEmpty;
+      size.trim().isNotEmpty ||
+      measurements.trim().isNotEmpty;
 
   StorefrontItem copyWith({
     String? imagePath,
@@ -27,6 +30,7 @@ class StorefrontItem {
     String? color,
     String? material,
     String? size,
+    String? measurements,
     bool? isFavorite,
   }) {
     return StorefrontItem(
@@ -35,6 +39,7 @@ class StorefrontItem {
       color: color ?? this.color,
       material: material ?? this.material,
       size: size ?? this.size,
+      measurements: measurements ?? this.measurements,
       isFavorite: isFavorite ?? this.isFavorite,
     );
   }
@@ -46,6 +51,7 @@ class StorefrontItem {
       'color': color,
       'material': material,
       'size': size,
+      'measurements': measurements,
       'is_favorite': isFavorite,
     };
   }
@@ -61,6 +67,7 @@ class StorefrontItem {
       color: json['color'] as String? ?? '',
       material: json['material'] as String? ?? '',
       size: json['size'] as String? ?? '',
+      measurements: json['measurements'] as String? ?? '',
       isFavorite:
           json['isFavorite'] as bool? ?? json['is_favorite'] as bool? ?? false,
     );
@@ -78,6 +85,8 @@ class Shop {
     required this.description,
     required this.storefrontItems,
     required this.businessCardImage,
+    required this.sellerWechat,
+    required this.sellerWechatLink,
     required this.productsCount,
     required this.createdAt,
   });
@@ -91,6 +100,8 @@ class Shop {
   final String description;
   final List<StorefrontItem> storefrontItems;
   final String businessCardImage;
+  final String sellerWechat;
+  final String sellerWechatLink;
   final int productsCount;
   final DateTime createdAt;
 
@@ -112,6 +123,8 @@ class Shop {
     String? description,
     List<StorefrontItem>? storefrontItems,
     String? businessCardImage,
+    String? sellerWechat,
+    String? sellerWechatLink,
     int? productsCount,
   }) {
     return Shop(
@@ -126,6 +139,8 @@ class Shop {
         storefrontItems ?? this.storefrontItems,
       ),
       businessCardImage: businessCardImage ?? this.businessCardImage,
+      sellerWechat: sellerWechat ?? this.sellerWechat,
+      sellerWechatLink: sellerWechatLink ?? this.sellerWechatLink,
       productsCount: productsCount ?? this.productsCount,
       createdAt: createdAt,
     );
@@ -180,6 +195,14 @@ class Shop {
       businessCardImage:
           json['businessCardImage'] as String? ??
           json['business_card_image'] as String? ??
+          '',
+      sellerWechat:
+          json['sellerWechat'] as String? ??
+          json['seller_wechat'] as String? ??
+          '',
+      sellerWechatLink:
+          json['sellerWechatLink'] as String? ??
+          json['seller_wechat_link'] as String? ??
           '',
       productsCount:
           json['productsCount'] as int? ?? json['products_count'] as int? ?? 0,

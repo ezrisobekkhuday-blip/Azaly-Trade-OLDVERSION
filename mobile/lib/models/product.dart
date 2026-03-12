@@ -4,11 +4,13 @@ class Product {
     required this.shopId,
     required this.shopName,
     required this.imagePaths,
+    required this.article,
     required this.amount,
     required this.quantity,
     required this.color,
     required this.material,
     required this.size,
+    required this.measurements,
     required this.status,
     required this.createdAt,
     required this.isFavorite,
@@ -18,11 +20,13 @@ class Product {
   final String shopId;
   final String shopName;
   final List<String> imagePaths;
+  final String article;
   final String amount;
   final int quantity;
   final String color;
   final String material;
   final String size;
+  final String measurements;
   final String status;
   final DateTime createdAt;
   final bool isFavorite;
@@ -41,11 +45,13 @@ class Product {
     String? shopId,
     String? shopName,
     List<String>? imagePaths,
+    String? article,
     String? amount,
     int? quantity,
     String? color,
     String? material,
     String? size,
+    String? measurements,
     String? status,
     bool? isFavorite,
   }) {
@@ -54,11 +60,13 @@ class Product {
       shopId: shopId ?? this.shopId,
       shopName: shopName ?? this.shopName,
       imagePaths: imagePaths ?? this.imagePaths,
+      article: article ?? this.article,
       amount: amount ?? this.amount,
       quantity: quantity ?? this.quantity,
       color: color ?? this.color,
       material: material ?? this.material,
       size: size ?? this.size,
+      measurements: measurements ?? this.measurements,
       status: status ?? this.status,
       createdAt: createdAt,
       isFavorite: isFavorite ?? this.isFavorite,
@@ -76,11 +84,13 @@ class Product {
       shopName:
           json['shopName'] as String? ?? json['shop_name'] as String? ?? '',
       imagePaths: List<String>.from(rawImages as List<dynamic>? ?? const []),
+      article: json['article'] as String? ?? '',
       amount: json['amount'] as String? ?? '',
       quantity: (json['quantity'] as num?)?.toInt() ?? 1,
       color: json['color'] as String? ?? '',
       material: json['material'] as String? ?? '',
       size: json['size'] as String? ?? '',
+      measurements: json['measurements'] as String? ?? '',
       status: json['status'] as String? ?? 'new',
       createdAt:
           DateTime.tryParse(rawCreatedAt as String? ?? '') ?? DateTime.now(),

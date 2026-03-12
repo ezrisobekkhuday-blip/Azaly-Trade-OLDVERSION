@@ -74,6 +74,18 @@ def ensure_product_columns() -> None:
                 text("ALTER TABLE products ADD COLUMN color VARCHAR(80) DEFAULT '' NOT NULL")
             )
 
+        if "article" not in columns:
+            connection.execute(
+                text("ALTER TABLE products ADD COLUMN article VARCHAR(120) DEFAULT '' NOT NULL")
+            )
+
+        if "measurements" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE products ADD COLUMN measurements VARCHAR(160) DEFAULT '' NOT NULL"
+                )
+            )
+
 
 def ensure_shop_columns() -> None:
     inspector = inspect(engine)
@@ -101,6 +113,18 @@ def ensure_shop_columns() -> None:
         if "storefront_items" not in columns:
             connection.execute(
                 text("ALTER TABLE shops ADD COLUMN storefront_items JSON DEFAULT '[]' NOT NULL")
+            )
+
+        if "seller_wechat" not in columns:
+            connection.execute(
+                text("ALTER TABLE shops ADD COLUMN seller_wechat VARCHAR(255) DEFAULT '' NOT NULL")
+            )
+
+        if "seller_wechat_link" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE shops ADD COLUMN seller_wechat_link VARCHAR(1024) DEFAULT '' NOT NULL"
+                )
             )
 
         if "storefront_image" in columns:
@@ -247,6 +271,7 @@ def normalize_storefront_item(
         color = payload.color
         material = payload.material
         size = payload.size
+        measurements = payload.measurements
         is_favorite = payload.is_favorite
     else:
         raw_image_path = payload.get("image_path") or payload.get("imagePath") or ""
@@ -254,6 +279,7 @@ def normalize_storefront_item(
         color = payload.get("color", "")
         material = payload.get("material", "")
         size = payload.get("size", "")
+        measurements = payload.get("measurements", "")
         is_favorite = payload.get("is_favorite") or payload.get("isFavorite") or False
 
     image_path = normalize_image_path(str(raw_image_path).strip())
@@ -267,6 +293,7 @@ def normalize_storefront_item(
         "color": str(color).strip(),
         "material": str(material).strip(),
         "size": str(size).strip(),
+        "measurements": str(measurements).strip(),
         "is_favorite": bool(is_favorite),
     }
 
@@ -369,6 +396,8 @@ def serialize_shop(request: Request, shop: Shop, products_count: int = 0) -> Sho
         business_card_image=to_public_image_url(request, shop.business_card_image)
         if shop.business_card_image
         else "",
+        seller_wechat=shop.seller_wechat,
+        seller_wechat_link=shop.seller_wechat_link,
         products_count=products_count,
         created_at=shop.created_at,
     )
@@ -380,11 +409,13 @@ def serialize_product(request: Request, product: Product, shop_name: str = "") -
         shop_id=str(product.shop_id or ""),
         shop_name=shop_name,
         images=[to_public_image_url(request, image) for image in product.images],
+        article=product.article,
         amount=product.amount,
         quantity=product.quantity,
         color=product.color,
         material=product.material,
         size=product.size,
+        measurements=product.measurements,
         status=product.status,
         is_favorite=product.is_favorite,
         created_at=product.created_at,
@@ -586,6 +617,8 @@ def create_shop(
         business_card_image=normalize_image_path(payload.business_card_image.strip())
         if payload.business_card_image.strip()
         else "",
+        seller_wechat=payload.seller_wechat.strip(),
+        seller_wechat_link=payload.seller_wechat_link.strip(),
     )
     db.add(shop)
     db.commit()
@@ -634,6 +667,8 @@ def update_shop(
     shop.storefront_images = new_storefront_images
     shop.storefront_image = new_storefront
     shop.business_card_image = new_business_card
+    shop.seller_wechat = payload.seller_wechat.strip()
+    shop.seller_wechat_link = payload.seller_wechat_link.strip()
 
     db.commit()
     db.refresh(shop)
@@ -704,11 +739,13 @@ def create_product(
     product = Product(
         shop_id=shop.id,
         images=[normalize_image_path(image) for image in payload.images],
+        article=payload.article.strip(),
         amount=payload.amount.strip(),
         quantity=max(1, payload.quantity),
         color=payload.color.strip(),
         material=payload.material.strip(),
         size=payload.size.strip(),
+        measurements=payload.measurements.strip(),
         status="new",
         is_favorite=payload.is_favorite,
     )
@@ -738,11 +775,13 @@ def update_product(
 
     product.shop_id = shop.id
     product.images = normalized_images
+    product.article = payload.article.strip()
     product.amount = payload.amount.strip()
     product.quantity = max(1, payload.quantity)
     product.color = payload.color.strip()
     product.material = payload.material.strip()
     product.size = payload.size.strip()
+    product.measurements = payload.measurements.strip()
     product.is_favorite = payload.is_favorite
 
     db.commit()

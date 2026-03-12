@@ -48,12 +48,150 @@ class AppStrings {
   }
 
   String t(String key) {
+    final dynamicValue = _dynamicValue(key);
+    if (dynamicValue != null) {
+      return dynamicValue;
+    }
+
     final value = _localizedValues[key];
     if (value == null) {
       return key;
     }
 
     return value[language.code] ?? value['en'] ?? key;
+  }
+
+  String? _dynamicValue(String key) {
+    switch (key) {
+      case 'sizeSuggestionsTitle':
+        switch (language) {
+          case AppLanguage.ru:
+            return '\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0438 \u043f\u043e \u0440\u0430\u0437\u043c\u0435\u0440\u0430\u043c';
+          case AppLanguage.en:
+            return 'Size suggestions';
+          case AppLanguage.zh:
+            return '\u5c3a\u7801\u63d0\u793a';
+        }
+      case 'measurementsLabel':
+        switch (language) {
+          case AppLanguage.ru:
+            return '\u0414\u043b\u0438\u043d\u0430 / \u0448\u0438\u0440\u0438\u043d\u0430';
+          case AppLanguage.en:
+            return 'Measurements';
+          case AppLanguage.zh:
+            return '\u957f\u5ea6 / \u5bbd\u5ea6';
+        }
+      case 'measurementsHint':
+        switch (language) {
+          case AppLanguage.ru:
+            return '\u041d\u0430\u043f\u0440\u0438\u043c\u0435\u0440: 70x110, \u0434\u043b\u0438\u043d\u0430 120, \u0448\u0438\u0440\u0438\u043d\u0430 58';
+          case AppLanguage.en:
+            return 'Example: 70x110, length 120, width 58';
+          case AppLanguage.zh:
+            return '\u4f8b\u5982\uff1a70x110\uff0c\u957f120\uff0c\u5bbd58';
+        }
+      case 'sellerWechatLabel':
+        switch (language) {
+          case AppLanguage.ru:
+            return 'WeChat \u043f\u0440\u043e\u0434\u0430\u0432\u0446\u0430';
+          case AppLanguage.en:
+            return 'Seller WeChat';
+          case AppLanguage.zh:
+            return '\u5356\u5bb6 WeChat';
+        }
+      case 'sellerWechatHint':
+        switch (language) {
+          case AppLanguage.ru:
+            return 'ID, QR-\u0441\u0441\u044b\u043b\u043a\u0430 \u0438\u043b\u0438 WeChat-\u043a\u043e\u043d\u0442\u0430\u043a\u0442';
+          case AppLanguage.en:
+            return 'ID, QR link, or WeChat contact';
+          case AppLanguage.zh:
+            return 'ID\uff0c\u4e8c\u7ef4\u7801\u94fe\u63a5\u6216 WeChat \u8054\u7cfb\u65b9\u5f0f';
+        }
+      case 'scanWechat':
+        switch (language) {
+          case AppLanguage.ru:
+            return '\u0421\u043a\u0430\u043d\u0438\u0440\u043e\u0432\u0430\u0442\u044c WeChat';
+          case AppLanguage.en:
+            return 'Scan WeChat';
+          case AppLanguage.zh:
+            return '\u626b\u63cf WeChat';
+        }
+      case 'scanWechatDescription':
+        switch (language) {
+          case AppLanguage.ru:
+            return '\u041d\u0430\u0432\u0435\u0434\u0438 \u043a\u0430\u043c\u0435\u0440\u0443 \u043d\u0430 QR-\u043a\u043e\u0434 \u043f\u0440\u043e\u0434\u0430\u0432\u0446\u0430.';
+          case AppLanguage.en:
+            return 'Point the camera at the seller QR code.';
+          case AppLanguage.zh:
+            return '\u628a\u6444\u50cf\u5934\u5bf9\u51c6\u5356\u5bb6\u7684\u4e8c\u7ef4\u7801\u3002';
+        }
+      case 'openWechat':
+        switch (language) {
+          case AppLanguage.ru:
+            return '\u041e\u0442\u043a\u0440\u044b\u0442\u044c WeChat';
+          case AppLanguage.en:
+            return 'Open WeChat';
+          case AppLanguage.zh:
+            return '\u6253\u5f00 WeChat';
+        }
+      case 'enableCamera':
+        switch (language) {
+          case AppLanguage.ru:
+            return '\u0412\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u043a\u0430\u043c\u0435\u0440\u0443';
+          case AppLanguage.en:
+            return 'Enable camera';
+          case AppLanguage.zh:
+            return '\u5f00\u542f\u6444\u50cf\u5934';
+        }
+      case 'wechatQrProcessing':
+        switch (language) {
+          case AppLanguage.ru:
+            return '\u0420\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u0451\u043c QR-\u043a\u043e\u0434...';
+          case AppLanguage.en:
+            return 'Reading QR code...';
+          case AppLanguage.zh:
+            return '\u6b63\u5728\u8bc6\u522b QR \u7801...';
+        }
+      case 'wechatQrNotFound':
+        switch (language) {
+          case AppLanguage.ru:
+            return 'QR-\u043a\u043e\u0434 WeChat \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d. \u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439 \u0435\u0449\u0451 \u0440\u0430\u0437.';
+          case AppLanguage.en:
+            return 'WeChat QR code was not found. Try again.';
+          case AppLanguage.zh:
+            return '\u672a\u627e\u5230 WeChat \u4e8c\u7ef4\u7801\uff0c\u8bf7\u518d\u8bd5\u4e00\u6b21\u3002';
+        }
+      case 'wechatQrDecodeFailed':
+        switch (language) {
+          case AppLanguage.ru:
+            return '\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0440\u043e\u0447\u0438\u0442\u0430\u0442\u044c WeChat QR-\u043a\u043e\u0434.';
+          case AppLanguage.en:
+            return 'Failed to read the WeChat QR code.';
+          case AppLanguage.zh:
+            return '\u65e0\u6cd5\u8bc6\u522b WeChat \u4e8c\u7ef4\u7801\u3002';
+        }
+      case 'wechatCopied':
+        switch (language) {
+          case AppLanguage.ru:
+            return 'WeChat \u0441\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d.';
+          case AppLanguage.en:
+            return 'WeChat copied.';
+          case AppLanguage.zh:
+            return 'WeChat \u5df2\u590d\u5236\u3002';
+        }
+      case 'sellerWechatEmpty':
+        switch (language) {
+          case AppLanguage.ru:
+            return 'WeChat \u043f\u0440\u043e\u0434\u0430\u0432\u0446\u0430 \u0435\u0449\u0451 \u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d.';
+          case AppLanguage.en:
+            return 'Seller WeChat is empty.';
+          case AppLanguage.zh:
+            return '\u5356\u5bb6 WeChat \u8fd8\u6ca1\u586b\u5199\u3002';
+        }
+    }
+
+    return null;
   }
 
   String formatShopCount(int count) {
@@ -728,6 +866,12 @@ class AppStrings {
       'ru': 'Нажми, чтобы загрузить карту',
       'en': 'Tap to load the map',
       'zh': '点击加载地图',
+    },
+    'articleLabel': {'ru': 'Артикул', 'en': 'Article', 'zh': '货号'},
+    'articleHint': {
+      'ru': 'Например: A-102',
+      'en': 'Example: A-102',
+      'zh': '例如：A-102',
     },
   };
 }

@@ -44,6 +44,11 @@ class StorefrontItemSummaryCard extends StatelessWidget {
           icon: Icons.straighten_outlined,
           label: item.size.trim(),
         ),
+      if (item.measurements.trim().isNotEmpty)
+        _StorefrontOverlayChip(
+          icon: Icons.square_foot_outlined,
+          label: item.measurements.trim(),
+        ),
     ];
 
     return InkWell(
@@ -108,10 +113,12 @@ class _StorefrontItemEditorSheetState extends State<StorefrontItemEditorSheet> {
   late final TextEditingController _colorController;
   late final TextEditingController _materialController;
   late final TextEditingController _sizeController;
+  late final TextEditingController _measurementsController;
   bool _isAmountExpanded = true;
   bool _isColorExpanded = false;
   bool _isMaterialExpanded = false;
   bool _isSizeExpanded = false;
+  bool _isMeasurementsExpanded = false;
 
   @override
   void initState() {
@@ -120,6 +127,9 @@ class _StorefrontItemEditorSheetState extends State<StorefrontItemEditorSheet> {
     _colorController = TextEditingController(text: widget.item.color);
     _materialController = TextEditingController(text: widget.item.material);
     _sizeController = TextEditingController(text: widget.item.size);
+    _measurementsController = TextEditingController(
+      text: widget.item.measurements,
+    );
   }
 
   @override
@@ -128,6 +138,7 @@ class _StorefrontItemEditorSheetState extends State<StorefrontItemEditorSheet> {
     _colorController.dispose();
     _materialController.dispose();
     _sizeController.dispose();
+    _measurementsController.dispose();
     super.dispose();
   }
 
@@ -139,6 +150,7 @@ class _StorefrontItemEditorSheetState extends State<StorefrontItemEditorSheet> {
         color: _colorController.text.trim(),
         material: _materialController.text.trim(),
         size: _sizeController.text.trim(),
+        measurements: _measurementsController.text.trim(),
       ),
     );
   }
@@ -317,6 +329,26 @@ class _StorefrontItemEditorSheetState extends State<StorefrontItemEditorSheet> {
                       ),
                     ],
                     allowMultiSelect: true,
+                    collapsibleSuggestions: true,
+                    initiallyExpanded: false,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _StorefrontEditorSection(
+                  title: strings.t('measurementsLabel'),
+                  summary: _summaryOf(_measurementsController.text, strings),
+                  isExpanded: _isMeasurementsExpanded,
+                  onToggle: () {
+                    setState(() {
+                      _isMeasurementsExpanded = !_isMeasurementsExpanded;
+                    });
+                  },
+                  child: TextField(
+                    controller: _measurementsController,
+                    decoration: InputDecoration(
+                      labelText: strings.t('measurementsLabel'),
+                      hintText: strings.t('measurementsHint'),
+                    ),
                   ),
                 ),
               ],

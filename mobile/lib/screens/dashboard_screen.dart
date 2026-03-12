@@ -543,6 +543,11 @@ class _DashboardPurchaseCard extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    if (product.article.trim().isNotEmpty)
+                      _DashboardInfoChip(
+                        label: strings.t('articleLabel'),
+                        value: product.article.trim(),
+                      ),
                     _DashboardInfoChip(
                       label: strings.t('priceLabel'),
                       value: product.amount.isEmpty
@@ -571,6 +576,8 @@ class _DashboardPurchaseCard extends StatelessWidget {
                       localizeMaterialValue(language, product.material),
                     if (product.size.trim().isNotEmpty)
                       localizeSizeValue(language, product.size),
+                    if (product.measurements.trim().isNotEmpty)
+                      product.measurements.trim(),
                   ].join(' · '),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
