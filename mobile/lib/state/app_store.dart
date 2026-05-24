@@ -97,6 +97,7 @@ class AppStore extends ChangeNotifier {
   }
 
   ShopPurchaseSummary purchaseSummaryForShop(String shopId) {
+    var productCount = 0;
     var totalQuantity = 0;
     var grossTotal = 0.0;
     var netTotal = 0.0;
@@ -106,12 +107,35 @@ class AppStore extends ChangeNotifier {
         continue;
       }
 
+      productCount += 1;
       totalQuantity += product.quantity;
       grossTotal += product.grossTotalValue ?? 0;
       netTotal += product.totalValue ?? 0;
     }
 
     return ShopPurchaseSummary(
+      productCount: productCount,
+      totalQuantity: totalQuantity,
+      grossTotal: grossTotal,
+      netTotal: netTotal,
+    );
+  }
+
+  ShopPurchaseSummary purchaseSummaryForAllShops() {
+    var productCount = 0;
+    var totalQuantity = 0;
+    var grossTotal = 0.0;
+    var netTotal = 0.0;
+
+    for (final product in _products) {
+      productCount += 1;
+      totalQuantity += product.quantity;
+      grossTotal += product.grossTotalValue ?? 0;
+      netTotal += product.totalValue ?? 0;
+    }
+
+    return ShopPurchaseSummary(
+      productCount: productCount,
       totalQuantity: totalQuantity,
       grossTotal: grossTotal,
       netTotal: netTotal,
@@ -565,11 +589,13 @@ class AppStore extends ChangeNotifier {
 
 class ShopPurchaseSummary {
   const ShopPurchaseSummary({
+    required this.productCount,
     required this.totalQuantity,
     required this.grossTotal,
     required this.netTotal,
   });
 
+  final int productCount;
   final int totalQuantity;
   final double grossTotal;
   final double netTotal;

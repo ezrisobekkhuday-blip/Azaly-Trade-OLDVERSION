@@ -2,6 +2,18 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
+class SectionStatItem {
+  const SectionStatItem({
+    required this.value,
+    required this.label,
+    this.highlighted = false,
+  });
+
+  final String value;
+  final String label;
+  final bool highlighted;
+}
+
 class SectionHeroCard extends StatelessWidget {
   const SectionHeroCard({
     super.key,
@@ -12,6 +24,7 @@ class SectionHeroCard extends StatelessWidget {
     required this.count,
     required this.countLabel,
     required this.colors,
+    this.stats,
   });
 
   final String badge;
@@ -21,6 +34,7 @@ class SectionHeroCard extends StatelessWidget {
   final int count;
   final String countLabel;
   final List<Color> colors;
+  final List<SectionStatItem>? stats;
 
   @override
   Widget build(BuildContext context) {
@@ -72,31 +86,92 @@ class SectionHeroCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0x73060A14),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.border),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final statItems = stats ??
+                  [
+                    SectionStatItem(
+                      value: count.toString(),
+                      label: countLabel,
+                    ),
+                  ];
+              final columns = constraints.maxWidth >= 960
+                  ? 5
+                  : constraints.maxWidth >= 720
+                  ? 3
+                  : 2;
+              const spacing = 10.0;
+              final tileWidth =
+                  (constraints.maxWidth - (columns - 1) * spacing) / columns;
+
+              return Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: statItems
+                    .map(
+                      (item) => SizedBox(
+                        width: tileWidth,
+                        child: _SectionStatTile(
+                          value: item.value,
+                          label: item.label,
+                          highlighted: item.highlighted,
+                        ),
+                      ),
+                    )
+                    .toList(),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionStatTile extends StatelessWidget {
+  const _SectionStatTile({
+    required this.value,
+    required this.label,
+    this.highlighted = false,
+  });
+
+  final String value;
+  final String label;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0x73060A14),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: highlighted
+              ? AppColors.primary.withValues(alpha: 0.35)
+              : AppColors.border,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: highlighted ? AppColors.primary : AppColors.textPrimary,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  count.toString(),
-                  style: textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  countLabel,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodyMedium?.copyWith(color: AppColors.textMuted),
           ),
         ],
       ),

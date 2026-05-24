@@ -8,6 +8,8 @@ import '../state/app_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/product_image.dart';
+import '../utils/shop_search.dart';
+import '../widgets/search_matched_product_card.dart';
 import '../widgets/section_cards.dart';
 import 'image_gallery_page.dart';
 import 'shop_editor_sheet.dart';
@@ -15,10 +17,25 @@ import 'shop_details_screen.dart';
 
 enum _ShopCardAction { pin, edit, delete }
 
-class ShopsScreen extends StatelessWidget {
+class ShopsScreen extends StatefulWidget {
   const ShopsScreen({super.key, required this.store});
 
   final AppStore store;
+
+  @override
+  State<ShopsScreen> createState() => _ShopsScreenState();
+}
+
+class _ShopsScreenState extends State<ShopsScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  AppStore get store => widget.store;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   Future<void> _openShop(BuildContext context, Shop shop) async {
     await Navigator.of(context).push(
@@ -152,6 +169,16 @@ class ShopsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final shops = store.shops;
     final strings = AppStrings.of(context);
+    final totals = store.purchaseSummaryForAllShops();
+    final searchQuery = _searchController.text;
+    final searchResults = filterShopsForSearch(
+      shops: shops,
+      products: store.allProducts,
+      query: searchQuery,
+    );
+    final visibleResults = searchResults;
+    final isProductSearch = searchQuery.trim().isNotEmpty &&
+        visibleResults.any((result) => result.hasMatchedProducts);
 
     return AppBackground(
       child: SafeArea(
@@ -167,8 +194,68 @@ class ShopsScreen extends StatelessWidget {
               count: shops.length,
               countLabel: strings.t('totalShops'),
               colors: const [Color(0x2E7C92FF), Color(0x1461E5BE)],
+              stats: [
+                SectionStatItem(
+                  value: shops.length.toString(),
+                  label: strings.t('totalShops'),
+                ),
+                SectionStatItem(
+                  value: _formatSummaryMoney(totals.grossTotal),
+                  label: strings.t('grossTotalWithRateLabel'),
+                ),
+                SectionStatItem(
+                  value: _formatSummaryMoney(totals.netTotal),
+                  label: strings.t('netTotalWithRateLabel'),
+                  highlighted: true,
+                ),
+                SectionStatItem(
+                  value: totals.productCount.toString(),
+                  label: strings.t('allProductsTotalLabel'),
+                ),
+                SectionStatItem(
+                  value:
+                      '${totals.totalQuantity} ${strings.t('piecesShort')}',
+                  label: strings.t('allPiecesTotalLabel'),
+                ),
+              ],
             ),
             const SizedBox(height: 18),
+            if (shops.isNotEmpty)
+              TextField(
+                controller: _searchController,
+                onChanged: (_) => setState(() {}),
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  hintText: strings.t('shopsSearchHint'),
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: searchQuery.trim().isEmpty
+                      ? null
+                      : IconButton(
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                          icon: const Icon(Icons.close),
+                        ),
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.65),
+                    ),
+                  ),
+                ),
+              ),
+            if (shops.isNotEmpty) const SizedBox(height: 16),
             if (shops.isEmpty)
               EmptyStateCard(
                 icon: Icons.storefront_outlined,
@@ -176,10 +263,19 @@ class ShopsScreen extends StatelessWidget {
                 title: strings.t('noShopsTitle'),
                 description: strings.t('noShopsDescription'),
               )
+            else if (visibleResults.isEmpty)
+              EmptyStateCard(
+                icon: Icons.search_off_outlined,
+                iconColor: AppColors.textMuted,
+                title: strings.t('shopsSearchNoResults'),
+                description: strings.t('shopsSearchHint'),
+              )
             else
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final crossAxisCount = constraints.maxWidth >= 960
+                  final crossAxisCount = isProductSearch
+                      ? (constraints.maxWidth >= 1100 ? 2 : 1)
+                      : constraints.maxWidth >= 960
                       ? 4
                       : constraints.maxWidth >= 720
                       ? 3
@@ -194,19 +290,23 @@ class ShopsScreen extends StatelessWidget {
                   return Wrap(
                     spacing: spacing,
                     runSpacing: spacing,
-                    children: shops
+                    children: visibleResults
                         .map(
-                          (shop) => SizedBox(
+                          (result) => SizedBox(
                             width: itemWidth,
                             child: _ShopCard(
                               store: store,
-                              shop: shop,
-                              isPinned: store.isShopPinned(shop.id),
-                              onOpen: () => _openShop(context, shop),
-                              onPhotoTap: () => _openShopPhoto(context, shop),
-                              onTogglePin: () => _togglePin(context, shop),
-                              onEdit: () => _openEditor(context, shop),
-                              onDelete: () => _deleteShop(context, shop),
+                              shop: result.shop,
+                              matchedProducts: result.matchedProducts,
+                              isPinned: store.isShopPinned(result.shop.id),
+                              onOpen: () => _openShop(context, result.shop),
+                              onPhotoTap: () =>
+                                  _openShopPhoto(context, result.shop),
+                              onTogglePin: () =>
+                                  _togglePin(context, result.shop),
+                              onEdit: () => _openEditor(context, result.shop),
+                              onDelete: () =>
+                                  _deleteShop(context, result.shop),
                             ),
                           ),
                         )
@@ -231,10 +331,12 @@ class _ShopCard extends StatelessWidget {
     required this.onTogglePin,
     required this.onEdit,
     required this.onDelete,
+    this.matchedProducts = const [],
   });
 
   final AppStore store;
   final Shop shop;
+  final List<Product> matchedProducts;
   final bool isPinned;
   final VoidCallback onOpen;
   final VoidCallback onPhotoTap;
@@ -458,6 +560,21 @@ class _ShopCard extends StatelessWidget {
               ),
             ],
           ),
+          if (matchedProducts.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              strings.t('shopSearchMatchedProductsTitle'),
+              style: textTheme.labelLarge?.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            for (var index = 0; index < matchedProducts.length; index += 1) ...[
+              SearchMatchedProductCard(product: matchedProducts[index]),
+              if (index < matchedProducts.length - 1) const SizedBox(height: 8),
+            ],
+          ],
           const SizedBox(height: 12),
           Row(
             children: [

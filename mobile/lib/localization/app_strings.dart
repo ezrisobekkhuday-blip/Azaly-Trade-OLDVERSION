@@ -394,6 +394,16 @@ class AppStrings {
     },
     'photoReady': {'ru': 'Фото готово', 'en': 'Photo ready', 'zh': '照片已就绪'},
     'totalShops': {'ru': 'Всего магазинов', 'en': 'Total shops', 'zh': '店铺总数'},
+    'allProductsTotalLabel': {
+      'ru': 'Всего товаров',
+      'en': 'Total products',
+      'zh': '商品总数',
+    },
+    'allPiecesTotalLabel': {
+      'ru': 'Всего штук',
+      'en': 'Total pieces',
+      'zh': '总件数',
+    },
     'totalPiecesLabel': {'ru': 'Всего штук', 'en': 'Total qty', 'zh': '总件数'},
     'grossTotalWithRateLabel': {
       'ru': 'Сумма без 10%',
@@ -467,6 +477,31 @@ class AppStrings {
     },
     'shopsHeroBadge': {'ru': 'МАГАЗИНЫ', 'en': 'SHOPS', 'zh': '店铺'},
     'shopsHeroTitle': {'ru': 'Магазины', 'en': 'Shops', 'zh': '店铺'},
+    'shopsSearchHint': {
+      'ru': 'Поиск по магазину, артикулу, цвету, материалу, размеру…',
+      'en': 'Search shop, article, color, material, size…',
+      'zh': '搜索店铺、货号、颜色、材质、尺码…',
+    },
+    'shopsSearchNoResults': {
+      'ru': 'Ничего не найдено',
+      'en': 'No results found',
+      'zh': '未找到结果',
+    },
+    'shopSearchMatchPrefix': {
+      'ru': 'Найден товар',
+      'en': 'Matched product',
+      'zh': '匹配商品',
+    },
+    'shopSearchMatchedProductsTitle': {
+      'ru': 'Найденные товары',
+      'en': 'Matched products',
+      'zh': '匹配的商品',
+    },
+    'shopSearchMatchedInShop': {
+      'ru': 'Этот товар в этом магазине',
+      'en': 'This product is in this shop',
+      'zh': '该商品在此店铺中',
+    },
     'shopsHeroDescription': {
       'ru':
           'Здесь собраны все магазины. Открой нужный магазин и уже внутри создавай товары.',
