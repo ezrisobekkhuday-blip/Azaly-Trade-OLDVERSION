@@ -388,6 +388,12 @@ class _FavoriteCard extends StatelessWidget {
                     : product.amount,
               ),
               _InfoTile(
+                label: strings.t('unitPriceWithShareLabel'),
+                value: product.unitPriceWithShareValue == null
+                    ? strings.t('notSpecified')
+                    : formatProductMoney(product.unitPriceWithShareValue!),
+              ),
+              _InfoTile(
                 label: strings.t('piecesLabel'),
                 value: '${product.quantity}',
               ),

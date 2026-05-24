@@ -1,7 +1,10 @@
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from shutil import copyfileobj
 from uuid import uuid4
+
+SUPPLIER_SHARE_PERCENT = 10.0
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -83,6 +86,27 @@ def ensure_product_columns() -> None:
             connection.execute(
                 text(
                     "ALTER TABLE products ADD COLUMN measurements VARCHAR(160) DEFAULT '' NOT NULL"
+                )
+            )
+
+        if "supplier_share_percent" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE products ADD COLUMN supplier_share_percent FLOAT DEFAULT 10.0 NOT NULL"
+                )
+            )
+
+        if "supplier_share_amount" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE products ADD COLUMN supplier_share_amount FLOAT DEFAULT 0.0 NOT NULL"
+                )
+            )
+
+        if "unit_price_with_share" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE products ADD COLUMN unit_price_with_share FLOAT DEFAULT 0.0 NOT NULL"
                 )
             )
 
@@ -412,6 +436,9 @@ def serialize_product(request: Request, product: Product, shop_name: str = "") -
         article=product.article,
         amount=product.amount,
         quantity=product.quantity,
+        supplier_share_percent=float(product.supplier_share_percent),
+        supplier_share_amount=float(product.supplier_share_amount),
+        unit_price_with_share=float(product.unit_price_with_share),
         color=product.color,
         material=product.material,
         size=product.size,
@@ -480,6 +507,78 @@ def remove_unused_uploaded_images(db: Session, image_paths: list[str]) -> None:
         delete_uploaded_image(image_path)
 
 
+def parse_amount_value(raw_value: str) -> float | None:
+    normalized = re.sub(r"[^0-9.,]", "", raw_value.strip()).replace(",", ".")
+
+    if not normalized:
+        return None
+
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", normalized):
+        return None
+
+    return float(normalized)
+
+
+def calculate_product_pricing(
+    amount: str,
+    quantity: int,
+    supplier_share_percent: float = SUPPLIER_SHARE_PERCENT,
+) -> tuple[float, float, float]:
+    unit_price = parse_amount_value(amount)
+    if unit_price is None:
+        return supplier_share_percent, 0.0, 0.0
+
+    safe_quantity = max(1, quantity)
+    gross_total = unit_price * safe_quantity
+    supplier_share_amount = gross_total * (supplier_share_percent / 100.0)
+    supplier_share_per_unit = supplier_share_amount / safe_quantity
+    unit_price_with_share = unit_price + supplier_share_per_unit
+    return supplier_share_percent, supplier_share_amount, unit_price_with_share
+
+
+def resolve_product_pricing(
+    amount: str,
+    quantity: int,
+    supplier_share_percent: float | None = None,
+) -> tuple[float, float, float]:
+    share_percent = (
+        float(supplier_share_percent)
+        if supplier_share_percent is not None
+        else SUPPLIER_SHARE_PERCENT
+    )
+    return calculate_product_pricing(amount, quantity, share_percent)
+
+
+def backfill_supplier_share_values(db: Session) -> None:
+    products = list(db.scalars(select(Product)).all())
+    changed = False
+
+    for product in products:
+        share_percent = (
+            float(product.supplier_share_percent)
+            if product.supplier_share_percent is not None
+            else SUPPLIER_SHARE_PERCENT
+        )
+        resolved_percent, share_amount, unit_price_with_share = calculate_product_pricing(
+            product.amount,
+            product.quantity,
+            share_percent,
+        )
+
+        if (
+            float(product.supplier_share_percent) != resolved_percent
+            or float(product.supplier_share_amount) != share_amount
+            or float(product.unit_price_with_share) != unit_price_with_share
+        ):
+            product.supplier_share_percent = resolved_percent
+            product.supplier_share_amount = share_amount
+            product.unit_price_with_share = unit_price_with_share
+            changed = True
+
+    if changed:
+        db.commit()
+
+
 def validate_product_images(images: list[str]) -> None:
     if not images:
         raise HTTPException(
@@ -527,6 +626,7 @@ async def lifespan(_: FastAPI):
     with SessionLocal() as db:
         ensure_profile(db)
         ensure_existing_products_have_shop(db)
+        backfill_supplier_share_values(db)
 
     yield
 
@@ -735,6 +835,11 @@ def create_product(
 ) -> ProductRead:
     validate_product_images(payload.images)
     shop = get_shop_or_404(payload.shop_id, db)
+    share_percent, share_amount, unit_price_with_share = resolve_product_pricing(
+        payload.amount,
+        payload.quantity,
+        payload.supplier_share_percent,
+    )
 
     product = Product(
         shop_id=shop.id,
@@ -742,6 +847,9 @@ def create_product(
         article=payload.article.strip(),
         amount=payload.amount.strip(),
         quantity=max(1, payload.quantity),
+        supplier_share_percent=share_percent,
+        supplier_share_amount=share_amount,
+        unit_price_with_share=unit_price_with_share,
         color=payload.color.strip(),
         material=payload.material.strip(),
         size=payload.size.strip(),
@@ -772,12 +880,22 @@ def update_product(
     shop = get_shop_or_404(payload.shop_id, db)
     normalized_images = [normalize_image_path(image) for image in payload.images]
     removed_images = [image for image in product.images if image not in normalized_images]
+    share_percent, share_amount, unit_price_with_share = resolve_product_pricing(
+        payload.amount,
+        payload.quantity,
+        payload.supplier_share_percent
+        if payload.supplier_share_percent is not None
+        else float(product.supplier_share_percent),
+    )
 
     product.shop_id = shop.id
     product.images = normalized_images
     product.article = payload.article.strip()
     product.amount = payload.amount.strip()
     product.quantity = max(1, payload.quantity)
+    product.supplier_share_percent = share_percent
+    product.supplier_share_amount = share_amount
+    product.unit_price_with_share = unit_price_with_share
     product.color = payload.color.strip()
     product.material = payload.material.strip()
     product.size = payload.size.strip()

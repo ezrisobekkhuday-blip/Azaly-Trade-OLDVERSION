@@ -1199,6 +1199,12 @@ class _ShopProductCard extends StatelessWidget {
                     : product.amount,
               ),
               _MiniInfo(
+                label: strings.t('unitPriceWithShareLabel'),
+                value: product.unitPriceWithShareValue == null
+                    ? strings.t('notSpecified')
+                    : formatProductMoney(product.unitPriceWithShareValue!),
+              ),
+              _MiniInfo(
                 label: strings.t('totalLabel'),
                 value: product.totalValue == null
                     ? strings.t('notSpecified')
@@ -1315,6 +1321,15 @@ class _PurchaseSummaryCard extends StatelessWidget {
                 color: AppColors.textSecondary,
               ),
             ),
+            if (calculateUnitPriceWithShare(amount, quantity) != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                '${strings.t('unitPriceWithShareLabel')}: ${formatProductMoney(calculateUnitPriceWithShare(amount, quantity)!)}',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
             const SizedBox(height: 6),
             Text(
               '${strings.t('totalLabel')}: ${formatProductMoney(total!)}',
@@ -1416,6 +1431,15 @@ class _InlineTotalCard extends StatelessWidget {
                 color: AppColors.textSecondary,
               ),
             ),
+            if (product.unitPriceWithShareValue != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                '${strings.t('unitPriceWithShareLabel')}: ${formatProductMoney(product.unitPriceWithShareValue!)}',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
             const SizedBox(height: 6),
             Text(
               '${strings.t('totalLabel')}: ${formatProductMoney(total)}',

@@ -81,6 +81,7 @@ class ProductCreate(BaseModel):
     article: str = ""
     amount: str = ""
     quantity: int = Field(default=1, ge=1)
+    supplier_share_percent: float | None = None
     color: str = ""
     material: str = ""
     size: str = ""
@@ -94,6 +95,7 @@ class ProductUpdate(BaseModel):
     article: str = ""
     amount: str = ""
     quantity: int = Field(default=1, ge=1)
+    supplier_share_percent: float | None = None
     color: str = ""
     material: str = ""
     size: str = ""
@@ -109,6 +111,9 @@ class ProductRead(BaseModel):
     article: str
     amount: str
     quantity: int
+    supplier_share_percent: float
+    supplier_share_amount: float
+    unit_price_with_share: float
     color: str
     material: str
     size: str

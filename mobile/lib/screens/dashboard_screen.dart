@@ -555,6 +555,12 @@ class _DashboardPurchaseCard extends StatelessWidget {
                           : product.amount,
                     ),
                     _DashboardInfoChip(
+                      label: strings.t('unitPriceWithShareLabel'),
+                      value: product.unitPriceWithShareValue == null
+                          ? strings.t('notSpecified')
+                          : formatProductMoney(product.unitPriceWithShareValue!),
+                    ),
+                    _DashboardInfoChip(
                       label: strings.t('piecesLabel'),
                       value: '${product.quantity}',
                     ),

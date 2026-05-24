@@ -768,6 +768,11 @@ class AppStrings {
       'zh': '未填写价格',
     },
     'priceLabel': {'ru': 'Цена', 'en': 'Price', 'zh': '价格'},
+    'unitPriceWithShareLabel': {
+      'ru': 'Цена 1 шт. с долей',
+      'en': 'Unit price incl. share',
+      'zh': '含分成单价',
+    },
     'totalLabel': {'ru': 'Итог', 'en': 'Total', 'zh': '总计'},
     'piecesLabel': {'ru': 'Штук', 'en': 'Qty', 'zh': '件数'},
     'piecesShort': {'ru': 'шт', 'en': 'pcs', 'zh': '件'},

@@ -246,6 +246,7 @@ class ApiClient {
         'article': article,
         'amount': amount,
         'quantity': quantity,
+        'supplier_share_percent': supplierShareRate * 100,
         'color': color,
         'material': material,
         'size': size,
@@ -273,6 +274,7 @@ class ApiClient {
         'article': product.article,
         'amount': product.amount,
         'quantity': product.quantity,
+        'supplier_share_percent': product.supplierSharePercent,
         'color': product.color,
         'material': product.material,
         'size': product.size,
@@ -436,12 +438,20 @@ String _resolveBaseUrl() {
   }
 
   if (kIsWeb) {
-    return Uri.base.origin;
+    final base = Uri.base;
+    final isLocalHost =
+        base.host == 'localhost' || base.host == '127.0.0.1';
+
+    if (isLocalHost) {
+      return '${base.scheme}://${base.host}:8080';
+    }
+
+    return base.origin;
   }
 
   if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-    return 'http://34.173.218.175:8080';
+    return 'http://127.0.0.1:8080';
   }
 
-  return 'http://34.173.218.175:8080';
+  return 'http://127.0.0.1:8080';
 }

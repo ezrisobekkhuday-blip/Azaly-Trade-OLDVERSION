@@ -7,6 +7,9 @@ class Product {
     required this.article,
     required this.amount,
     required this.quantity,
+    required this.supplierSharePercent,
+    required this.supplierShareAmount,
+    required this.unitPriceWithShare,
     required this.color,
     required this.material,
     required this.size,
@@ -23,6 +26,9 @@ class Product {
   final String article;
   final String amount;
   final int quantity;
+  final double supplierSharePercent;
+  final double supplierShareAmount;
+  final double unitPriceWithShare;
   final String color;
   final String material;
   final String size;
@@ -35,10 +41,42 @@ class Product {
 
   double? get grossTotalValue => calculateGrossTotal(amount, quantity);
 
-  double? get supplierShareValue => calculateSupplierShare(amount, quantity);
+  double? get supplierShareValue {
+    if (supplierShareAmount > 0) {
+      return supplierShareAmount;
+    }
+
+    return calculateSupplierShare(amount, quantity, supplierSharePercent);
+  }
 
   double? get totalValue {
-    return calculateNetTotal(amount, quantity);
+    final unitWithShare = unitPriceWithShareValue;
+    if (unitWithShare != null) {
+      return unitWithShare * quantity;
+    }
+
+    final grossTotal = grossTotalValue;
+    final supplierShare = supplierShareValue;
+
+    if (grossTotal != null && supplierShare != null) {
+      return grossTotal + supplierShare;
+    }
+
+    return calculateNetTotal(amount, quantity, supplierSharePercent);
+  }
+
+  double? get unitPriceWithShareValue {
+    if (unitPriceWithShare > 0) {
+      return unitPriceWithShare;
+    }
+
+    final unitPrice = amountValue;
+    final supplierShare = supplierShareValue;
+    if (unitPrice == null || supplierShare == null || quantity < 1) {
+      return null;
+    }
+
+    return unitPrice + (supplierShare / quantity);
   }
 
   Product copyWith({
@@ -48,6 +86,9 @@ class Product {
     String? article,
     String? amount,
     int? quantity,
+    double? supplierSharePercent,
+    double? supplierShareAmount,
+    double? unitPriceWithShare,
     String? color,
     String? material,
     String? size,
@@ -63,6 +104,10 @@ class Product {
       article: article ?? this.article,
       amount: amount ?? this.amount,
       quantity: quantity ?? this.quantity,
+      supplierSharePercent:
+          supplierSharePercent ?? this.supplierSharePercent,
+      supplierShareAmount: supplierShareAmount ?? this.supplierShareAmount,
+      unitPriceWithShare: unitPriceWithShare ?? this.unitPriceWithShare,
       color: color ?? this.color,
       material: material ?? this.material,
       size: size ?? this.size,
@@ -87,6 +132,18 @@ class Product {
       article: json['article'] as String? ?? '',
       amount: json['amount'] as String? ?? '',
       quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+      supplierSharePercent:
+          (json['supplierSharePercent'] as num?)?.toDouble() ??
+          (json['supplier_share_percent'] as num?)?.toDouble() ??
+          supplierShareRate * 100,
+      supplierShareAmount:
+          (json['supplierShareAmount'] as num?)?.toDouble() ??
+          (json['supplier_share_amount'] as num?)?.toDouble() ??
+          0,
+      unitPriceWithShare:
+          (json['unitPriceWithShare'] as num?)?.toDouble() ??
+          (json['unit_price_with_share'] as num?)?.toDouble() ??
+          0,
       color: json['color'] as String? ?? '',
       material: json['material'] as String? ?? '',
       size: json['size'] as String? ?? '',
@@ -135,24 +192,47 @@ double? calculateGrossTotal(String amount, int quantity) {
   return parsedAmount * quantity;
 }
 
-double? calculateSupplierShare(String amount, int quantity) {
+double? calculateSupplierShare(
+  String amount,
+  int quantity, [
+  double sharePercent = supplierShareRate * 100,
+]) {
   final grossTotal = calculateGrossTotal(amount, quantity);
 
   if (grossTotal == null) {
     return null;
   }
 
-  return grossTotal * supplierShareRate;
+  return grossTotal * (sharePercent / 100);
 }
 
-double? calculateNetTotal(String amount, int quantity) {
+double? calculateNetTotal(
+  String amount,
+  int quantity, [
+  double sharePercent = supplierShareRate * 100,
+]) {
   final grossTotal = calculateGrossTotal(amount, quantity);
 
   if (grossTotal == null) {
     return null;
   }
 
-  return grossTotal + (grossTotal * supplierShareRate);
+  return grossTotal + (grossTotal * (sharePercent / 100));
+}
+
+double? calculateUnitPriceWithShare(
+  String amount,
+  int quantity, [
+  double sharePercent = supplierShareRate * 100,
+]) {
+  final unitPrice = parseProductAmount(amount);
+  final supplierShare = calculateSupplierShare(amount, quantity, sharePercent);
+
+  if (unitPrice == null || supplierShare == null || quantity < 1) {
+    return null;
+  }
+
+  return unitPrice + (supplierShare / quantity);
 }
 
 String formatProductMoney(double value) {
