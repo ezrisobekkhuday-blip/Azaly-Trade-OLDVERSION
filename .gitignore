@@ -9,3 +9,5 @@ backend/__pycache__/
 backend/app/__pycache__/
 backend/*.db
 backend/*.sqlite3
+backend/OLD_DATA
+backend/uploads
