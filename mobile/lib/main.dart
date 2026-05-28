@@ -96,11 +96,11 @@ class _HomeShellState extends State<HomeShell> {
   String _dashboardTabLabel(AppLanguage language) {
     switch (language) {
       case AppLanguage.ru:
-        return '\u0414\u0430\u0448\u0431\u043e\u0440\u0434';
+        return 'Портировка';
       case AppLanguage.en:
-        return 'Dashboard';
+        return 'Porting';
       case AppLanguage.zh:
-        return '\u770b\u677f';
+        return '分拣';
     }
   }
 
@@ -165,15 +165,55 @@ class _HomeShellState extends State<HomeShell> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => SettingsSheet(initialLanguage: widget.store.language),
+      builder: (_) => SettingsSheet(
+        initialLanguage: widget.store.language,
+        initialUsdToCny: widget.store.usdToCny,
+        initialUsdToUzs: widget.store.usdToUzs,
+      ),
     );
 
     if (result == null || !mounted) {
       return;
     }
 
-    if (result.language != widget.store.language) {
-      await widget.store.updateLanguage(result.language);
+    try {
+      final languageChanged = result.language != widget.store.language;
+      final ratesChanged =
+          result.usdToCny != widget.store.usdToCny ||
+          result.usdToUzs != widget.store.usdToUzs;
+
+      if (ratesChanged) {
+        await widget.store.updateCurrencyRates(
+          usdToCny: result.usdToCny,
+          usdToUzs: result.usdToUzs,
+        );
+      }
+
+      if (languageChanged) {
+        await widget.store.updateLanguage(result.language);
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      if (languageChanged || ratesChanged) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppStrings.of(context).t('settingsSaved')),
+          ),
+        );
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppStrings.of(context).t('settingsSaveFailed')),
+        ),
+      );
     }
   }
 
@@ -419,26 +459,80 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  Widget _loadErrorBanner(AppStrings strings) {
+    final message = widget.store.loadError;
+
+    if (message == null || message.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Material(
+        color: AppColors.danger.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              const Icon(Icons.cloud_off_outlined, color: AppColors.danger),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  strings.language == AppLanguage.ru
+                      ? 'Не удалось загрузить данные. Проверьте, что backend запущен на порту 8080.'
+                      : 'Failed to load data. Check that the backend is running on port 8080.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+              TextButton(
+                onPressed: widget.store.reload,
+                child: Text(
+                  strings.language == AppLanguage.ru ? 'Повторить' : 'Retry',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
     final destinations = _destinations(strings);
+    final loadErrorBanner = _loadErrorBanner(strings);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= _desktopBreakpoint;
 
         if (isDesktop) {
-          return _buildDesktopShell(strings, destinations);
+          return Column(
+            children: [
+              loadErrorBanner,
+              Expanded(child: _buildDesktopShell(strings, destinations)),
+            ],
+          );
         }
 
         final useCompactMobileShell = constraints.maxWidth < 720;
 
         if (useCompactMobileShell) {
-          return _buildCompactShell(strings, destinations);
+          return Column(
+            children: [
+              loadErrorBanner,
+              Expanded(child: _buildCompactShell(strings, destinations)),
+            ],
+          );
         }
 
-        return Scaffold(
+        return Column(
+          children: [
+            loadErrorBanner,
+            Expanded(
+              child: Scaffold(
           extendBody: true,
           appBar: AppBar(
             titleSpacing: 20,
@@ -478,6 +572,9 @@ class _HomeShellState extends State<HomeShell> {
               ),
             ),
           ),
+              ),
+            ),
+          ],
         );
       },
     );
