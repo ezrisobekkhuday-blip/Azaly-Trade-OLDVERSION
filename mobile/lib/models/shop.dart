@@ -68,8 +68,9 @@ class StorefrontItem {
       material: json['material'] as String? ?? '',
       size: json['size'] as String? ?? '',
       measurements: json['measurements'] as String? ?? '',
-      isFavorite:
-          json['isFavorite'] as bool? ?? json['is_favorite'] as bool? ?? false,
+      isFavorite: _readStorefrontBool(
+        json['isFavorite'] ?? json['is_favorite'],
+      ),
     );
   }
 }
@@ -205,9 +206,24 @@ class Shop {
           json['seller_wechat_link'] as String? ??
           '',
       productsCount:
-          json['productsCount'] as int? ?? json['products_count'] as int? ?? 0,
+          (json['productsCount'] as num?)?.toInt() ??
+          (json['products_count'] as num?)?.toInt() ??
+          0,
       createdAt:
           DateTime.tryParse(rawCreatedAt as String? ?? '') ?? DateTime.now(),
     );
   }
+}
+
+bool _readStorefrontBool(Object? value) {
+  if (value is bool) {
+    return value;
+  }
+
+  if (value is num) {
+    return value != 0;
+  }
+
+  final normalized = '$value'.trim().toLowerCase();
+  return normalized == 'true' || normalized == '1';
 }

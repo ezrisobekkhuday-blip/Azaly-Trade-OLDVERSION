@@ -2,8 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../localization/app_strings.dart';
+import '../models/batch_item_type.dart';
 import '../models/expense.dart';
 import '../models/product.dart';
+import '../models/product_batch.dart';
 import '../models/shop.dart';
 import '../services/api_client.dart';
 import '../utils/image_source_utils.dart';
@@ -17,14 +19,21 @@ class AppStore extends ChangeNotifier {
   final ApiClient _apiClient;
   bool _isReady = false;
   String _displayName = 'Azaly Trade';
+  double _usdToCny = 0;
+  double _usdToUzs = 0;
   AppLanguage _language = AppLanguage.ru;
   final List<String> _pinnedShopIds = [];
   final List<Shop> _shops = [];
   final List<Product> _products = [];
   final List<Expense> _expenses = [];
+  final List<ProductBatch> _batches = [];
+  String? _loadError;
 
   bool get isReady => _isReady;
+  String? get loadError => _loadError;
   String get displayName => _displayName;
+  double get usdToCny => _usdToCny;
+  double get usdToUzs => _usdToUzs;
   AppLanguage get language => _language;
   List<Shop> get shops {
     final orderedShops = List<Shop>.from(_shops);
@@ -50,6 +59,10 @@ class AppStore extends ChangeNotifier {
 
   List<Product> get allProducts => List.unmodifiable(_products);
   List<Expense> get expenses => List.unmodifiable(_expenses);
+  List<ProductBatch> get batches => List.unmodifiable(_batches);
+  List<Product> get unbatchedProducts => List.unmodifiable(
+    _products.where((product) => product.batchId == null),
+  );
   List<Product> get favoriteProducts =>
       List.unmodifiable(_products.where((product) => product.isFavorite));
   List<FavoriteStorefrontEntry> get favoriteStorefrontItems {
@@ -142,6 +155,8 @@ class AppStore extends ChangeNotifier {
     );
   }
 
+  Future<void> reload() => load();
+
   Future<void> load() async {
     final preferences = await SharedPreferences.getInstance();
     _language = AppLanguage.fromCode(
@@ -152,8 +167,11 @@ class AppStore extends ChangeNotifier {
       ..addAll(preferences.getStringList(_pinnedShopsStorageKey) ?? const []);
 
     try {
+      _loadError = null;
       final bootstrap = await _apiClient.fetchBootstrap();
-      _displayName = bootstrap.displayName;
+      _displayName = bootstrap.profile.displayName;
+      _usdToCny = bootstrap.profile.usdToCny;
+      _usdToUzs = bootstrap.profile.usdToUzs;
       _shops
         ..clear()
         ..addAll(bootstrap.shops);
@@ -163,13 +181,20 @@ class AppStore extends ChangeNotifier {
       _expenses
         ..clear()
         ..addAll(bootstrap.expenses);
+      _batches
+        ..clear()
+        ..addAll(bootstrap.batches);
+      _syncProductsFromBatches();
       _syncShopCounts();
       await _cleanupPinnedShops();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('AppStore.load failed: $error\n$stackTrace');
+      _loadError = error.toString();
       _displayName = 'Azaly Trade';
       _shops.clear();
       _products.clear();
       _expenses.clear();
+      _batches.clear();
     }
 
     _isReady = true;
@@ -182,6 +207,21 @@ class AppStore extends ChangeNotifier {
     );
 
     _displayName = updatedName;
+    notifyListeners();
+  }
+
+  Future<void> updateCurrencyRates({
+    required double usdToCny,
+    required double usdToUzs,
+  }) async {
+    final profile = await _apiClient.updateProfile(
+      name: _displayName,
+      usdToCny: usdToCny,
+      usdToUzs: usdToUzs,
+    );
+
+    _usdToCny = profile.usdToCny;
+    _usdToUzs = profile.usdToUzs;
     notifyListeners();
   }
 
@@ -348,6 +388,83 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> updateProductBatchItemType({
+    required String productId,
+    required BatchItemType batchItemType,
+  }) async {
+    final serverProduct = await _apiClient.updateProductBatchItemType(
+      productId: productId,
+      batchItemType: batchItemType.apiValue,
+    );
+
+    await refreshBatches();
+    _replaceProductInStore(serverProduct);
+    notifyListeners();
+  }
+
+  Future<void> detachProductFromBatch(String productId) async {
+    final serverProduct = await _apiClient.detachProductFromBatch(productId);
+
+    final index = _products.indexWhere((item) => item.id == productId);
+
+    if (index != -1) {
+      _products[index] = serverProduct;
+    }
+
+    _removeProductFromAllBatches(productId);
+    await refreshBatches();
+  }
+
+  void _removeProductFromAllBatches(String productId) {
+    for (var batchIndex = 0; batchIndex < _batches.length; batchIndex += 1) {
+      final batch = _batches[batchIndex];
+      final filteredProducts = batch.products
+          .where((product) => product.id != productId)
+          .toList();
+
+      if (filteredProducts.length == batch.products.length) {
+        continue;
+      }
+
+      _batches[batchIndex] = ProductBatch(
+        id: batch.id,
+        name: batch.name,
+        note: batch.note,
+        createdAt: batch.createdAt,
+        products: filteredProducts,
+      );
+    }
+  }
+
+  void _replaceProductInStore(Product product) {
+    final index = _products.indexWhere((item) => item.id == product.id);
+
+    if (index != -1) {
+      _products[index] = product;
+    }
+
+    for (var batchIndex = 0; batchIndex < _batches.length; batchIndex += 1) {
+      final batch = _batches[batchIndex];
+      final productIndex = batch.products.indexWhere(
+        (item) => item.id == product.id,
+      );
+
+      if (productIndex == -1) {
+        continue;
+      }
+
+      final updatedProducts = List<Product>.from(batch.products);
+      updatedProducts[productIndex] = product;
+      _batches[batchIndex] = ProductBatch(
+        id: batch.id,
+        name: batch.name,
+        note: batch.note,
+        createdAt: batch.createdAt,
+        products: updatedProducts,
+      );
+    }
+  }
+
   Future<void> updateProduct(Product updatedProduct) async {
     final index = _products.indexWhere(
       (product) => product.id == updatedProduct.id,
@@ -378,11 +495,17 @@ class AppStore extends ChangeNotifier {
     required String title,
     required String amount,
     required String note,
+    required String accountingType,
+    required String accountingChannel,
+    required String currency,
   }) async {
     final createdExpense = await _apiClient.createExpense(
       title: title.trim(),
       amount: amount.trim(),
       note: note.trim(),
+      accountingType: accountingType,
+      accountingChannel: accountingChannel,
+      currency: currency,
     );
 
     _expenses.insert(0, createdExpense);
@@ -398,14 +521,123 @@ class AppStore extends ChangeNotifier {
       return;
     }
 
+    final previousBatchId = _expenses[index].batchId;
     _expenses[index] = await _apiClient.updateExpense(updatedExpense);
-    notifyListeners();
+
+    if (previousBatchId != null || _expenses[index].batchId != null) {
+      await refreshBatches();
+    } else {
+      notifyListeners();
+    }
   }
 
   Future<void> deleteExpense(String expenseId) async {
+    final index = _expenses.indexWhere((expense) => expense.id == expenseId);
+    final linkedBatchId = index == -1 ? null : _expenses[index].batchId;
+
     await _apiClient.deleteExpense(expenseId);
     _expenses.removeWhere((expense) => expense.id == expenseId);
+
+    if (linkedBatchId != null) {
+      await refreshBatches();
+    } else {
+      notifyListeners();
+    }
+  }
+
+  Future<void> attachExpenseToBatch({
+    required String expenseId,
+    required String batchId,
+  }) =>
+      updateExpenseBatchAssignment(expenseId: expenseId, batchId: batchId);
+
+  Future<void> detachExpenseFromBatch(String expenseId) =>
+      updateExpenseBatchAssignment(expenseId: expenseId, batchId: null);
+
+  Future<void> updateExpenseBatchAssignment({
+    required String expenseId,
+    String? batchId,
+  }) async {
+    final expense = await _apiClient.updateExpenseBatchAssignment(
+      expenseId: expenseId,
+      batchId: batchId,
+    );
+
+    final index = _expenses.indexWhere((item) => item.id == expenseId);
+
+    if (index != -1) {
+      _expenses[index] = expense;
+    }
+
+    await refreshBatches();
+  }
+
+  Future<ProductBatch> createBatch({
+    required String name,
+    required List<String> productIds,
+    String note = '',
+  }) async {
+    final batch = await _apiClient.createBatch(
+      name: name,
+      productIds: productIds,
+      note: note,
+    );
+
+    _applyBatch(batch);
     notifyListeners();
+    return batch;
+  }
+
+  Future<ProductBatch> addProductsToBatch({
+    required String batchId,
+    required List<String> productIds,
+  }) async {
+    final batch = await _apiClient.addProductsToBatch(
+      batchId: batchId,
+      productIds: productIds,
+    );
+
+    _applyBatch(batch);
+    notifyListeners();
+    return batch;
+  }
+
+  Future<void> refreshBatches() async {
+    _batches
+      ..clear()
+      ..addAll(await _apiClient.fetchBatches());
+    _syncProductsFromBatches();
+    notifyListeners();
+  }
+
+  void _applyBatch(ProductBatch batch) {
+    final existingIndex = _batches.indexWhere((item) => item.id == batch.id);
+
+    if (existingIndex == -1) {
+      _batches.insert(0, batch);
+    } else {
+      _batches[existingIndex] = batch;
+    }
+
+    for (final product in batch.products) {
+      final index = _products.indexWhere((item) => item.id == product.id);
+
+      if (index != -1) {
+        _products[index] = product;
+      }
+    }
+  }
+
+  void _syncProductsFromBatches() {
+    for (final batch in _batches) {
+      for (final product in batch.products) {
+        final index = _products.indexWhere((item) => item.id == product.id);
+
+        if (index != -1) {
+          _products[index] = product;
+        }
+      }
+    }
   }
 
   Future<void> toggleFavorite(String productId) async {

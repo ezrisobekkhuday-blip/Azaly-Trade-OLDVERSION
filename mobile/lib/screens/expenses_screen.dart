@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../localization/app_strings.dart';
 import '../models/expense.dart';
+import '../models/expense_meta.dart';
+import '../models/product_batch.dart';
 import '../models/product.dart';
 import '../services/api_client.dart';
 import '../state/app_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
+import '../widgets/attach_expense_to_batch_dialog.dart';
+import '../widgets/expense_details_fields.dart';
+import '../widgets/expenses_monthly_panel.dart';
 import '../widgets/section_cards.dart';
-import '../widgets/suggestion_field.dart';
 
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key, required this.store});
@@ -25,6 +28,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
   bool _isSaving = false;
+  String _accountingType = ExpenseAccountingType.notSelected;
+  String _accountingChannel = ExpenseAccountingChannel.notSelected;
+  String _inputCurrency = ExpenseInputCurrency.cny;
 
   @override
   void dispose() {
@@ -67,14 +73,36 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     }
   }
 
-  String _sumLabel(AppLanguage language) {
+  String _totalCnyLabel(AppLanguage language) {
     switch (language) {
       case AppLanguage.ru:
-        return 'Общая сумма';
+        return 'Общая сумма CNY';
       case AppLanguage.en:
-        return 'Total amount';
+        return 'Total CNY';
       case AppLanguage.zh:
-        return '总金额';
+        return 'CNY 总金额';
+    }
+  }
+
+  String _totalUsdLabel(AppLanguage language) {
+    switch (language) {
+      case AppLanguage.ru:
+        return 'Общая сумма USD';
+      case AppLanguage.en:
+        return 'Total USD';
+      case AppLanguage.zh:
+        return 'USD 总金额';
+    }
+  }
+
+  String _totalUzsLabel(AppLanguage language) {
+    switch (language) {
+      case AppLanguage.ru:
+        return 'Общая сумма UZS';
+      case AppLanguage.en:
+        return 'Total UZS';
+      case AppLanguage.zh:
+        return 'UZS 总金额';
     }
   }
 
@@ -92,11 +120,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   String _composerDescription(AppLanguage language) {
     switch (language) {
       case AppLanguage.ru:
-        return 'Напиши название расхода, сумму и при желании заметку.';
+        return 'Выбери категорию, тип и канал учёта, валюту ввода, сумму и при желании заметку.';
       case AppLanguage.en:
-        return 'Enter the expense title, amount, and an optional note.';
+        return 'Choose category, accounting type and channel, input currency, amount, and an optional note.';
       case AppLanguage.zh:
-        return '填写支出名称、金额，以及可选备注。';
+        return '选择类别、记账类型和渠道、输入货币、金额，以及可选备注。';
     }
   }
 
@@ -199,17 +227,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     }
 
     return items;
-  }
-
-  String _amountLabel(AppLanguage language) {
-    switch (language) {
-      case AppLanguage.ru:
-        return 'Сумма';
-      case AppLanguage.en:
-        return 'Amount';
-      case AppLanguage.zh:
-        return '金额';
-    }
   }
 
   String _noteLabel(AppLanguage language) {
@@ -333,6 +350,121 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     }
   }
 
+  String _expenseAttachedLabel(AppLanguage language) {
+    switch (language) {
+      case AppLanguage.ru:
+        return 'Расход привязан к партии, себестоимость пересчитана.';
+      case AppLanguage.en:
+        return 'Expense attached to batch. Unit costs recalculated.';
+      case AppLanguage.zh:
+        return '支出已关联到批次，单位成本已重新计算。';
+    }
+  }
+
+  String _expenseBatchChangedLabel(AppLanguage language) {
+    switch (language) {
+      case AppLanguage.ru:
+        return 'Партия расхода изменена, себестоимость пересчитана.';
+      case AppLanguage.en:
+        return 'Expense batch updated. Unit costs recalculated.';
+      case AppLanguage.zh:
+        return '支出批次已更新，单位成本已重新计算。';
+    }
+  }
+
+  String _expenseDetachedLabel(AppLanguage language) {
+    switch (language) {
+      case AppLanguage.ru:
+        return 'Расход откреплён от партии, себестоимость пересчитана.';
+      case AppLanguage.en:
+        return 'Expense detached from batch. Unit costs recalculated.';
+      case AppLanguage.zh:
+        return '支出已从批次解除关联，单位成本已重新计算。';
+    }
+  }
+
+  String _detachExpenseTitle(AppLanguage language) {
+    switch (language) {
+      case AppLanguage.ru:
+        return 'Открепить расход от партии?';
+      case AppLanguage.en:
+        return 'Detach expense from batch?';
+      case AppLanguage.zh:
+        return '从批次解除关联？';
+    }
+  }
+
+  String _detachExpenseConfirmLabel(AppLanguage language) {
+    switch (language) {
+      case AppLanguage.ru:
+        return 'Открепить';
+      case AppLanguage.en:
+        return 'Detach';
+      case AppLanguage.zh:
+        return '解除关联';
+    }
+  }
+
+  String _cannotDetachExpenseLabel(AppLanguage language) {
+    switch (language) {
+      case AppLanguage.ru:
+        return 'Не удалось открепить расход от партии.';
+      case AppLanguage.en:
+        return 'Failed to detach expense from batch.';
+      case AppLanguage.zh:
+        return '无法从批次解除关联。';
+    }
+  }
+
+  String _cannotChangeExpenseBatchLabel(AppLanguage language) {
+    switch (language) {
+      case AppLanguage.ru:
+        return 'Не удалось изменить партию расхода.';
+      case AppLanguage.en:
+        return 'Failed to change expense batch.';
+      case AppLanguage.zh:
+        return '无法更改支出批次。';
+    }
+  }
+
+  String _cannotAttachExpenseLabel(AppLanguage language) {
+    switch (language) {
+      case AppLanguage.ru:
+        return 'Не удалось привязать расход к партии.';
+      case AppLanguage.en:
+        return 'Failed to attach expense to batch.';
+      case AppLanguage.zh:
+        return '无法将支出关联到批次。';
+    }
+  }
+
+  String _expenseBatchLabel(AppLanguage language, String batchName) {
+    switch (language) {
+      case AppLanguage.ru:
+        return 'Партия: $batchName';
+      case AppLanguage.en:
+        return 'Batch: $batchName';
+      case AppLanguage.zh:
+        return '批次：$batchName';
+    }
+  }
+
+  String? _batchNameForExpense(Expense expense) {
+    final batchId = expense.batchId;
+
+    if (batchId == null || batchId.isEmpty) {
+      return null;
+    }
+
+    for (final batch in widget.store.batches) {
+      if (batch.id == batchId) {
+        return batch.name;
+      }
+    }
+
+    return null;
+  }
+
   String _emptyDescription(AppLanguage language) {
     switch (language) {
       case AppLanguage.ru:
@@ -369,6 +501,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         title: title,
         amount: amount,
         note: _noteController.text,
+        accountingType: _accountingType,
+        accountingChannel: _accountingChannel,
+        currency: _inputCurrency,
       );
 
       if (!mounted) {
@@ -378,6 +513,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       _titleController.clear();
       _amountController.clear();
       _noteController.clear();
+      setState(() {
+        _accountingType = ExpenseAccountingType.notSelected;
+        _accountingChannel = ExpenseAccountingChannel.notSelected;
+        _inputCurrency = ExpenseInputCurrency.cny;
+      });
       _showMessage(_expenseSavedLabel(strings.language));
     } catch (error) {
       if (!mounted) {
@@ -407,10 +547,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => _ExpenseEditorSheet(
         expense: expense,
+        language: AppStrings.of(context).language,
+        categoryLabel: _titleLabel(AppStrings.of(context).language),
         titleHint: _titleHint(AppStrings.of(context).language),
         quickLabel: _categoryQuickLabel(AppStrings.of(context).language),
         suggestions: _categorySuggestions(AppStrings.of(context).language),
         quickItems: _popularCategories(AppStrings.of(context).language),
+        noteLabel: _noteLabel(AppStrings.of(context).language),
       ),
     );
 
@@ -434,6 +577,144 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           fallbackMessage: _cannotUpdateExpenseLabel(
             AppStrings.of(context).language,
           ),
+        ),
+      );
+    }
+  }
+
+  List<ProductBatch> _sortedBatches() {
+    return List<ProductBatch>.from(widget.store.batches)
+      ..sort((left, right) => right.createdAt.compareTo(left.createdAt));
+  }
+
+  Future<String?> _pickExpenseBatchId({
+    required AppLanguage language,
+    required AttachExpenseToBatchDialogMode mode,
+    String? initialBatchId,
+  }) {
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AttachExpenseToBatchDialog(
+        language: language,
+        batches: _sortedBatches(),
+        mode: mode,
+        initialBatchId: initialBatchId,
+      ),
+    );
+  }
+
+  Future<void> _attachExpenseToBatch(Expense expense) async {
+    final language = AppStrings.of(context).language;
+    final batchId = await _pickExpenseBatchId(
+      language: language,
+      mode: AttachExpenseToBatchDialogMode.attach,
+    );
+
+    if (batchId == null || !mounted) {
+      return;
+    }
+
+    try {
+      await widget.store.attachExpenseToBatch(
+        expenseId: expense.id,
+        batchId: batchId,
+      );
+
+      if (mounted) {
+        _showMessage(_expenseAttachedLabel(language));
+      }
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        describeError(
+          error,
+          fallbackMessage: _cannotAttachExpenseLabel(language),
+        ),
+      );
+    }
+  }
+
+  Future<void> _changeExpenseBatch(Expense expense) async {
+    final language = AppStrings.of(context).language;
+    final batchId = await _pickExpenseBatchId(
+      language: language,
+      mode: AttachExpenseToBatchDialogMode.change,
+      initialBatchId: expense.batchId,
+    );
+
+    if (batchId == null || !mounted) {
+      return;
+    }
+
+    if (batchId == expense.batchId) {
+      return;
+    }
+
+    try {
+      await widget.store.attachExpenseToBatch(
+        expenseId: expense.id,
+        batchId: batchId,
+      );
+
+      if (mounted) {
+        _showMessage(_expenseBatchChangedLabel(language));
+      }
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        describeError(
+          error,
+          fallbackMessage: _cannotChangeExpenseBatchLabel(language),
+        ),
+      );
+    }
+  }
+
+  Future<void> _detachExpenseFromBatch(Expense expense) async {
+    final strings = AppStrings.of(context);
+    final language = strings.language;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(_detachExpenseTitle(language)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(strings.t('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(_detachExpenseConfirmLabel(language)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    try {
+      await widget.store.detachExpenseFromBatch(expense.id);
+
+      if (mounted) {
+        _showMessage(_expenseDetachedLabel(language));
+      }
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        describeError(
+          error,
+          fallbackMessage: _cannotDetachExpenseLabel(language),
         ),
       );
     }
@@ -490,18 +771,17 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
     final language = strings.language;
-    final expenses = List<Expense>.from(widget.store.expenses)
-      ..sort((left, right) => right.createdAt.compareTo(left.createdAt));
-    final totalAmount = expenses.fold<double>(
-      0,
-      (sum, expense) => sum + (expense.amountValue ?? 0),
-    );
+    final expenses = List<Expense>.from(widget.store.expenses);
+    final totalCny = Expense.sumCny(expenses);
+    final totalUsd = Expense.sumUsd(expenses);
+    final totalUzs = Expense.sumUzs(expenses);
 
     return AppBackground(
       child: SafeArea(
         top: false,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+          cacheExtent: 2400,
           children: [
             SectionHeroCard(
               badge: _tabLabel(language).toUpperCase(),
@@ -516,26 +796,42 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             _ExpenseComposerCard(
               titleLabel: _composerTitle(language),
               description: _composerDescription(language),
-              titleFieldLabel: _titleLabel(language),
-              titleFieldHint: _titleHint(language),
-              titleSuggestions: _categorySuggestions(language),
+              language: language,
+              categoryLabel: _titleLabel(language),
+              categoryHint: _titleHint(language),
+              categorySuggestions: _categorySuggestions(language),
               quickLabel: _categoryQuickLabel(language),
               quickItems: _popularCategories(language),
-              amountFieldLabel: _amountLabel(language),
-              noteFieldLabel: _noteLabel(language),
+              noteLabel: _noteLabel(language),
               saveLabel: _saveExpenseLabel(language),
               titleController: _titleController,
               amountController: _amountController,
               noteController: _noteController,
+              accountingType: _accountingType,
+              accountingChannel: _accountingChannel,
+              inputCurrency: _inputCurrency,
+              onAccountingTypeChanged: (value) {
+                setState(() => _accountingType = value);
+              },
+              onAccountingChannelChanged: (value) {
+                setState(() => _accountingChannel = value);
+              },
+              onInputCurrencyChanged: (value) {
+                setState(() => _inputCurrency = value);
+              },
               isSaving: _isSaving,
               onSave: _saveExpense,
             ),
             const SizedBox(height: 18),
-            _ExpenseTotalCard(
+            _ExpenseStatsGrid(
               countLabel: _countLabel(language),
-              amountLabel: _sumLabel(language),
+              totalCnyLabel: _totalCnyLabel(language),
+              totalUsdLabel: _totalUsdLabel(language),
+              totalUzsLabel: _totalUzsLabel(language),
               count: expenses.length,
-              totalAmount: totalAmount,
+              totalCny: totalCny,
+              totalUsd: totalUsd,
+              totalUzs: totalUzs,
             ),
             const SizedBox(height: 18),
             if (expenses.isEmpty)
@@ -546,14 +842,23 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 description: _emptyDescription(language),
               )
             else
-              ...expenses.map(
-                (expense) => Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: _ExpenseCard(
-                    expense: expense,
-                    onEdit: () => _editExpense(expense),
-                    onDelete: () => _deleteExpense(expense),
-                  ),
+              ExpensesMonthlyPanel(
+                expenses: expenses,
+                language: language,
+                expenseCardBuilder: (expense) => _ExpenseCard(
+                  expense: expense,
+                  language: language,
+                  batchLabel: _batchNameForExpense(expense) == null
+                      ? null
+                      : _expenseBatchLabel(
+                          language,
+                          _batchNameForExpense(expense)!,
+                        ),
+                  onEdit: () => _editExpense(expense),
+                  onDelete: () => _deleteExpense(expense),
+                  onAttachToBatch: () => _attachExpenseToBatch(expense),
+                  onChangeBatch: () => _changeExpenseBatch(expense),
+                  onDetachFromBatch: () => _detachExpenseFromBatch(expense),
                 ),
               ),
           ],
@@ -567,34 +872,46 @@ class _ExpenseComposerCard extends StatelessWidget {
   const _ExpenseComposerCard({
     required this.titleLabel,
     required this.description,
-    required this.titleFieldLabel,
-    required this.titleFieldHint,
-    required this.titleSuggestions,
+    required this.language,
+    required this.categoryLabel,
+    required this.categoryHint,
+    required this.categorySuggestions,
     required this.quickLabel,
     required this.quickItems,
-    required this.amountFieldLabel,
-    required this.noteFieldLabel,
+    required this.noteLabel,
     required this.saveLabel,
     required this.titleController,
     required this.amountController,
     required this.noteController,
+    required this.accountingType,
+    required this.accountingChannel,
+    required this.inputCurrency,
+    required this.onAccountingTypeChanged,
+    required this.onAccountingChannelChanged,
+    required this.onInputCurrencyChanged,
     required this.isSaving,
     required this.onSave,
   });
 
   final String titleLabel;
   final String description;
-  final String titleFieldLabel;
-  final String titleFieldHint;
-  final List<String> titleSuggestions;
+  final AppLanguage language;
+  final String categoryLabel;
+  final String categoryHint;
+  final List<String> categorySuggestions;
   final String quickLabel;
   final List<String> quickItems;
-  final String amountFieldLabel;
-  final String noteFieldLabel;
+  final String noteLabel;
   final String saveLabel;
   final TextEditingController titleController;
   final TextEditingController amountController;
   final TextEditingController noteController;
+  final String accountingType;
+  final String accountingChannel;
+  final String inputCurrency;
+  final ValueChanged<String> onAccountingTypeChanged;
+  final ValueChanged<String> onAccountingChannelChanged;
+  final ValueChanged<String> onInputCurrencyChanged;
   final bool isSaving;
   final VoidCallback onSave;
 
@@ -626,30 +943,23 @@ class _ExpenseComposerCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          SuggestionField(
-            controller: titleController,
-            label: titleFieldLabel,
-            hint: titleFieldHint,
-            suggestions: titleSuggestions,
-            quickGroups: [
-              SuggestionGroup(label: quickLabel, items: quickItems),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: amountController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[0-9., ]')),
-            ],
-            decoration: InputDecoration(labelText: amountFieldLabel),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: noteController,
-            minLines: 2,
-            maxLines: 4,
-            decoration: InputDecoration(labelText: noteFieldLabel),
+          ExpenseDetailsFields(
+            language: language,
+            categoryLabel: categoryLabel,
+            categoryHint: categoryHint,
+            categorySuggestions: categorySuggestions,
+            quickLabel: quickLabel,
+            quickItems: quickItems,
+            noteLabel: noteLabel,
+            titleController: titleController,
+            amountController: amountController,
+            noteController: noteController,
+            accountingType: accountingType,
+            accountingChannel: accountingChannel,
+            inputCurrency: inputCurrency,
+            onAccountingTypeChanged: onAccountingTypeChanged,
+            onAccountingChannelChanged: onAccountingChannelChanged,
+            onInputCurrencyChanged: onInputCurrencyChanged,
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -670,118 +980,330 @@ class _ExpenseComposerCard extends StatelessWidget {
   }
 }
 
-class _ExpenseTotalCard extends StatelessWidget {
-  const _ExpenseTotalCard({
+class _ExpenseStatsGrid extends StatelessWidget {
+  const _ExpenseStatsGrid({
     required this.countLabel,
-    required this.amountLabel,
+    required this.totalCnyLabel,
+    required this.totalUsdLabel,
+    required this.totalUzsLabel,
     required this.count,
-    required this.totalAmount,
+    required this.totalCny,
+    required this.totalUsd,
+    required this.totalUzs,
   });
 
   final String countLabel;
-  final String amountLabel;
+  final String totalCnyLabel;
+  final String totalUsdLabel;
+  final String totalUzsLabel;
   final int count;
-  final double totalAmount;
+  final double totalCny;
+  final double totalUsd;
+  final double totalUzs;
+
+  static const double _cardHeight = 92;
+  static const double _spacing = 12;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _ExpenseStatBox(label: countLabel, value: '$count'),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _ExpenseStatBox(
-            label: amountLabel,
-            value: totalAmount <= 0 ? '0' : formatProductMoney(totalAmount),
-            highlighted: true,
-          ),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        if (!width.isFinite || width <= 0) {
+          return const SizedBox.shrink();
+        }
+
+        final columns = width >= 900 ? 4 : width >= 520 ? 2 : 1;
+        final tileWidth = (width - (columns - 1) * _spacing) / columns;
+
+        Widget tile(_ExpenseSummaryStatCard card) {
+          return SizedBox(
+            width: tileWidth,
+            height: _cardHeight,
+            child: card,
+          );
+        }
+
+        return Wrap(
+          spacing: _spacing,
+          runSpacing: _spacing,
+          children: [
+            tile(
+              _ExpenseSummaryStatCard(
+                label: countLabel,
+                value: '$count',
+              ),
+            ),
+            tile(
+              _ExpenseSummaryStatCard(
+                label: totalCnyLabel,
+                value: formatProductMoney(totalCny),
+                accentColor: AppColors.primary,
+              ),
+            ),
+            tile(
+              _ExpenseSummaryStatCard(
+                label: totalUsdLabel,
+                value: formatProductMoney(totalUsd),
+                accentColor: AppColors.accent,
+              ),
+            ),
+            tile(
+              _ExpenseSummaryStatCard(
+                label: totalUzsLabel,
+                value: formatProductMoney(totalUzs),
+                accentColor: AppColors.danger,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
-class _ExpenseStatBox extends StatelessWidget {
-  const _ExpenseStatBox({
+class _ExpenseSummaryStatCard extends StatelessWidget {
+  const _ExpenseSummaryStatCard({
     required this.label,
     required this.value,
-    this.highlighted = false,
+    this.accentColor,
   });
 
   final String label;
   final String value;
-  final bool highlighted;
+  final Color? accentColor;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final accent = accentColor;
+    final gradientColors = accent != null
+        ? [accent.withValues(alpha: 0.14), AppColors.surfaceStrong]
+        : const [AppColors.surfaceStrong, AppColors.surfaceMuted];
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: highlighted
-              ? [
-                  AppColors.danger.withValues(alpha: 0.16),
-                  AppColors.surfaceStrong,
-                ]
-              : [AppColors.surfaceStrong, AppColors.surfaceMuted],
+          colors: gradientColors,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: highlighted
-              ? AppColors.danger.withValues(alpha: 0.35)
-              : AppColors.border,
+          color: accent?.withValues(alpha: 0.32) ?? AppColors.border,
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.labelSmall?.copyWith(color: AppColors.textMuted),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: highlighted ? AppColors.danger : AppColors.textPrimary,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.labelSmall?.copyWith(
+                color: AppColors.textMuted,
+                height: 1.2,
+              ),
             ),
-          ),
-        ],
+            const Spacer(),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                maxLines: 1,
+                style: textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: accent ?? AppColors.textPrimary,
+                  height: 1,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-enum _ExpenseMenuAction { edit, delete }
+enum _ExpenseMenuAction {
+  attachToBatch,
+  changeBatch,
+  detachFromBatch,
+  edit,
+  delete,
+}
+
+class _ExpenseCurrencyChip extends StatelessWidget {
+  const _ExpenseCurrencyChip({
+    required this.currencyLabel,
+    required this.amount,
+    required this.accentColor,
+    this.compact = false,
+  });
+
+  final String currencyLabel;
+  final double amount;
+  final Color accentColor;
+  final bool compact;
+
+  static const double _height = 52;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final amountFontSize = compact ? 11.5 : 13.0;
+
+    return SizedBox(
+      height: _height,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: accentColor.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  formatProductMoney(amount),
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  style: textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: accentColor,
+                    fontSize: amountFontSize,
+                    height: 1,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                currencyLabel,
+                maxLines: 1,
+                style: textTheme.labelSmall?.copyWith(
+                  color: accentColor.withValues(alpha: 0.9),
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.35,
+                  height: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ExpenseCurrencyChipsRow extends StatelessWidget {
+  const _ExpenseCurrencyChipsRow({
+    required this.cny,
+    required this.usd,
+    required this.uzs,
+    this.alignEnd = false,
+  });
+
+  final double cny;
+  final double usd;
+  final double uzs;
+  final bool alignEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 720;
+    final chipWidth = compact ? 74.0 : 86.0;
+
+    Widget chip(String label, double amount, Color color) {
+      return SizedBox(
+        width: chipWidth,
+        child: _ExpenseCurrencyChip(
+          currencyLabel: label,
+          amount: amount,
+          accentColor: color,
+          compact: compact,
+        ),
+      );
+    }
+
+    final chips = <Widget>[
+      chip('CNY', cny, AppColors.primary),
+      chip('USD', usd, AppColors.accent),
+      chip('UZS', uzs, AppColors.danger),
+    ];
+
+    return Wrap(
+      alignment: alignEnd ? WrapAlignment.end : WrapAlignment.start,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 6,
+      runSpacing: 6,
+      children: chips,
+    );
+  }
+}
+
+class _ExpenseCurrencyChips extends StatelessWidget {
+  const _ExpenseCurrencyChips({required this.expense});
+
+  final Expense expense;
+
+  @override
+  Widget build(BuildContext context) {
+    final cnyAmount = expense.amountCny > 0
+        ? expense.amountCny
+        : (expense.amountValue ?? 0);
+
+    return _ExpenseCurrencyChipsRow(
+      cny: cnyAmount,
+      usd: expense.amountUsd,
+      uzs: expense.amountUzs,
+      alignEnd: true,
+    );
+  }
+}
 
 class _ExpenseCard extends StatelessWidget {
   const _ExpenseCard({
     required this.expense,
+    required this.language,
     required this.onEdit,
     required this.onDelete,
+    required this.onAttachToBatch,
+    required this.onChangeBatch,
+    required this.onDetachFromBatch,
+    this.batchLabel,
   });
 
   final Expense expense;
+  final AppLanguage language;
+  final String? batchLabel;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onAttachToBatch;
+  final VoidCallback onChangeBatch;
+  final VoidCallback onDetachFromBatch;
+
+  bool get _isLinkedToBatch =>
+      expense.batchId != null && expense.batchId!.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
     final textTheme = Theme.of(context).textTheme;
 
-    return Container(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onEdit,
+        borderRadius: BorderRadius.circular(26),
+        child: Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -813,33 +1335,49 @@ class _ExpenseCard extends StatelessWidget {
                         color: AppColors.textMuted,
                       ),
                     ),
+                    if (batchLabel != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Text(
+                          batchLabel!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.labelSmall?.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    ExpenseMetaBadges(
+                      language: language,
+                      accountingType: expense.accountingType,
+                      accountingChannel: expense.accountingChannel,
+                      inputCurrency: expense.inputCurrency,
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.danger.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: AppColors.danger.withValues(alpha: 0.24),
-                  ),
-                ),
-                child: Text(
-                  expense.amountValue == null
-                      ? expense.amount
-                      : formatProductMoney(expense.amountValue!),
-                  style: textTheme.titleSmall?.copyWith(
-                    color: AppColors.danger,
-                    fontWeight: FontWeight.w800,
-                  ),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: _ExpenseCurrencyChips(expense: expense),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
               PopupMenuButton<_ExpenseMenuAction>(
                 tooltip: '',
                 padding: EdgeInsets.zero,
@@ -851,6 +1389,15 @@ class _ExpenseCard extends StatelessWidget {
                 icon: const Icon(Icons.more_horiz),
                 onSelected: (action) {
                   switch (action) {
+                    case _ExpenseMenuAction.attachToBatch:
+                      onAttachToBatch();
+                      break;
+                    case _ExpenseMenuAction.changeBatch:
+                      onChangeBatch();
+                      break;
+                    case _ExpenseMenuAction.detachFromBatch:
+                      onDetachFromBatch();
+                      break;
                     case _ExpenseMenuAction.edit:
                       onEdit();
                       break;
@@ -859,35 +1406,79 @@ class _ExpenseCard extends StatelessWidget {
                       break;
                   }
                 },
-                itemBuilder: (context) => [
-                  PopupMenuItem<_ExpenseMenuAction>(
-                    value: _ExpenseMenuAction.edit,
-                    child: Row(
-                      children: [
-                        const Icon(Icons.edit_outlined, size: 18),
-                        const SizedBox(width: 10),
-                        Text(strings.t('edit')),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem<_ExpenseMenuAction>(
-                    value: _ExpenseMenuAction.delete,
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.delete_outline,
-                          size: 18,
-                          color: AppColors.danger,
+                itemBuilder: (context) {
+                  final items = <PopupMenuEntry<_ExpenseMenuAction>>[];
+
+                  if (_isLinkedToBatch) {
+                    items.addAll([
+                      PopupMenuItem<_ExpenseMenuAction>(
+                        value: _ExpenseMenuAction.changeBatch,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.swap_horiz_outlined, size: 18),
+                            const SizedBox(width: 10),
+                            Text(_changeExpenseBatchMenuLabel(language)),
+                          ],
                         ),
-                        const SizedBox(width: 10),
-                        Text(
-                          strings.t('delete'),
-                          style: const TextStyle(color: AppColors.danger),
+                      ),
+                      PopupMenuItem<_ExpenseMenuAction>(
+                        value: _ExpenseMenuAction.detachFromBatch,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.link_off_outlined, size: 18),
+                            const SizedBox(width: 10),
+                            Text(_detachExpenseMenuLabel(language)),
+                          ],
                         ),
-                      ],
+                      ),
+                    ]);
+                  } else {
+                    items.add(
+                      PopupMenuItem<_ExpenseMenuAction>(
+                        value: _ExpenseMenuAction.attachToBatch,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.link_outlined, size: 18),
+                            const SizedBox(width: 10),
+                            Text(_attachExpenseMenuLabel(language)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  items.addAll([
+                    PopupMenuItem<_ExpenseMenuAction>(
+                      value: _ExpenseMenuAction.edit,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.edit_outlined, size: 18),
+                          const SizedBox(width: 10),
+                          Text(strings.t('edit')),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                    PopupMenuItem<_ExpenseMenuAction>(
+                      value: _ExpenseMenuAction.delete,
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.delete_outline,
+                            size: 18,
+                            color: AppColors.danger,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            strings.t('delete'),
+                            style: const TextStyle(color: AppColors.danger),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ]);
+
+                  return items;
+                },
               ),
             ],
           ),
@@ -902,24 +1493,65 @@ class _ExpenseCard extends StatelessWidget {
           ],
         ],
       ),
+        ),
+      ),
     );
+  }
+
+  String _attachExpenseMenuLabel(AppLanguage language) {
+    switch (language) {
+      case AppLanguage.ru:
+        return 'Привязать к партии';
+      case AppLanguage.en:
+        return 'Attach to batch';
+      case AppLanguage.zh:
+        return '关联到批次';
+    }
+  }
+
+  String _changeExpenseBatchMenuLabel(AppLanguage language) {
+    switch (language) {
+      case AppLanguage.ru:
+        return 'Изменить партию';
+      case AppLanguage.en:
+        return 'Change batch';
+      case AppLanguage.zh:
+        return '更换批次';
+    }
+  }
+
+  String _detachExpenseMenuLabel(AppLanguage language) {
+    switch (language) {
+      case AppLanguage.ru:
+        return 'Открепить от партии';
+      case AppLanguage.en:
+        return 'Detach from batch';
+      case AppLanguage.zh:
+        return '从批次解除关联';
+    }
   }
 }
 
 class _ExpenseEditorSheet extends StatefulWidget {
   const _ExpenseEditorSheet({
     required this.expense,
+    required this.language,
+    required this.categoryLabel,
     required this.titleHint,
     required this.quickLabel,
     required this.suggestions,
     required this.quickItems,
+    required this.noteLabel,
   });
 
   final Expense expense;
+  final AppLanguage language;
+  final String categoryLabel;
   final String titleHint;
   final String quickLabel;
   final List<String> suggestions;
   final List<String> quickItems;
+  final String noteLabel;
 
   @override
   State<_ExpenseEditorSheet> createState() => _ExpenseEditorSheetState();
@@ -929,39 +1561,9 @@ class _ExpenseEditorSheetState extends State<_ExpenseEditorSheet> {
   late final TextEditingController _titleController;
   late final TextEditingController _amountController;
   late final TextEditingController _noteController;
-
-  String _titleLabel(AppLanguage language) {
-    switch (language) {
-      case AppLanguage.ru:
-        return 'Название расхода';
-      case AppLanguage.en:
-        return 'Expense title';
-      case AppLanguage.zh:
-        return '支出名称';
-    }
-  }
-
-  String _amountLabel(AppLanguage language) {
-    switch (language) {
-      case AppLanguage.ru:
-        return 'Сумма';
-      case AppLanguage.en:
-        return 'Amount';
-      case AppLanguage.zh:
-        return '金额';
-    }
-  }
-
-  String _noteLabel(AppLanguage language) {
-    switch (language) {
-      case AppLanguage.ru:
-        return 'Заметка';
-      case AppLanguage.en:
-        return 'Note';
-      case AppLanguage.zh:
-        return '备注';
-    }
-  }
+  late String _accountingType;
+  late String _accountingChannel;
+  late String _inputCurrency;
 
   String _sheetTitle(AppLanguage language) {
     switch (language) {
@@ -980,6 +1582,9 @@ class _ExpenseEditorSheetState extends State<_ExpenseEditorSheet> {
     _titleController = TextEditingController(text: widget.expense.title);
     _amountController = TextEditingController(text: widget.expense.amount);
     _noteController = TextEditingController(text: widget.expense.note);
+    _accountingType = widget.expense.accountingType;
+    _accountingChannel = widget.expense.accountingChannel;
+    _inputCurrency = widget.expense.inputCurrency;
   }
 
   @override
@@ -993,7 +1598,7 @@ class _ExpenseEditorSheetState extends State<_ExpenseEditorSheet> {
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
-    final language = strings.language;
+    final language = widget.language;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Padding(
@@ -1016,35 +1621,29 @@ class _ExpenseEditorSheetState extends State<_ExpenseEditorSheet> {
               ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 16),
-            SuggestionField(
-              controller: _titleController,
-              label: _titleLabel(language),
-              hint: widget.titleHint,
-              suggestions: widget.suggestions,
-              quickGroups: [
-                SuggestionGroup(
-                  label: widget.quickLabel,
-                  items: widget.quickItems,
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _amountController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9., ]')),
-              ],
-              decoration: InputDecoration(labelText: _amountLabel(language)),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _noteController,
-              minLines: 2,
-              maxLines: 4,
-              decoration: InputDecoration(labelText: _noteLabel(language)),
+            ExpenseDetailsFields(
+              language: language,
+              categoryLabel: widget.categoryLabel,
+              categoryHint: widget.titleHint,
+              categorySuggestions: widget.suggestions,
+              quickLabel: widget.quickLabel,
+              quickItems: widget.quickItems,
+              noteLabel: widget.noteLabel,
+              titleController: _titleController,
+              amountController: _amountController,
+              noteController: _noteController,
+              accountingType: _accountingType,
+              accountingChannel: _accountingChannel,
+              inputCurrency: _inputCurrency,
+              onAccountingTypeChanged: (value) {
+                setState(() => _accountingType = value);
+              },
+              onAccountingChannelChanged: (value) {
+                setState(() => _accountingChannel = value);
+              },
+              onInputCurrencyChanged: (value) {
+                setState(() => _inputCurrency = value);
+              },
             ),
             const SizedBox(height: 16),
             Row(
@@ -1068,6 +1667,9 @@ class _ExpenseEditorSheetState extends State<_ExpenseEditorSheet> {
                           title: _titleController.text.trim(),
                           amount: _amountController.text.trim(),
                           note: _noteController.text.trim(),
+                          accountingType: _accountingType,
+                          accountingChannel: _accountingChannel,
+                          inputCurrency: _inputCurrency,
                         ),
                       );
                     },

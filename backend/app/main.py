@@ -14,12 +14,19 @@ from sqlalchemy import func, inspect, select, text
 from sqlalchemy.orm import Session
 
 from .database import Base, SessionLocal, engine, get_db
-from .models import Expense, Product, Profile, Shop
+from .models import Batch, Expense, Product, Profile, Shop
 from .schemas import (
+    BatchAddProducts,
+    BatchCreate,
+    BatchRead,
+    BatchUpdate,
+    ExpenseBatchAssignmentUpdate,
     ExpenseCreate,
     ExpenseRead,
     ExpenseUpdate,
     HealthResponse,
+    ProductBatchItemTypeUpdate,
+    ProductBatchMembershipUpdate,
     ProductCreate,
     ProductRead,
     ProductUpdate,
@@ -48,6 +55,155 @@ def ensure_profile(db: Session) -> Profile:
         db.refresh(profile)
 
     return profile
+
+
+def ensure_expense_columns() -> None:
+    inspector = inspect(engine)
+
+    if "expenses" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("expenses")}
+
+    with engine.begin() as connection:
+        if "amount_cny" not in columns:
+            connection.execute(
+                text("ALTER TABLE expenses ADD COLUMN amount_cny FLOAT DEFAULT 0.0 NOT NULL")
+            )
+
+        if "amount_usd" not in columns:
+            connection.execute(
+                text("ALTER TABLE expenses ADD COLUMN amount_usd FLOAT DEFAULT 0.0 NOT NULL")
+            )
+
+        if "amount_uzs" not in columns:
+            connection.execute(
+                text("ALTER TABLE expenses ADD COLUMN amount_uzs FLOAT DEFAULT 0.0 NOT NULL")
+            )
+
+        if "cny_to_usd_rate" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE expenses ADD COLUMN cny_to_usd_rate FLOAT DEFAULT 0.0 NOT NULL"
+                )
+            )
+
+        if "usd_to_cny_rate" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE expenses ADD COLUMN usd_to_cny_rate FLOAT DEFAULT 0.0 NOT NULL"
+                )
+            )
+
+        if "cny_to_usd_rate" in columns:
+            connection.execute(
+                text(
+                    """
+                    UPDATE expenses
+                    SET usd_to_cny_rate = CASE
+                        WHEN usd_to_cny_rate > 0 THEN usd_to_cny_rate
+                        WHEN cny_to_usd_rate > 0 AND cny_to_usd_rate < 2 THEN 1.0 / cny_to_usd_rate
+                        WHEN cny_to_usd_rate >= 2 THEN cny_to_usd_rate
+                        ELSE 0
+                    END
+                    """
+                )
+            )
+
+        if "usd_to_uzs_rate" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE expenses ADD COLUMN usd_to_uzs_rate FLOAT DEFAULT 0.0 NOT NULL"
+                )
+            )
+
+        if "accounting_type" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE expenses ADD COLUMN accounting_type "
+                    "VARCHAR(32) DEFAULT 'not_selected' NOT NULL"
+                )
+            )
+
+        if "accounting_channel" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE expenses ADD COLUMN accounting_channel "
+                    "VARCHAR(32) DEFAULT 'not_selected' NOT NULL"
+                )
+            )
+
+        if "currency" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE expenses ADD COLUMN currency "
+                    "VARCHAR(8) DEFAULT 'CNY' NOT NULL"
+                )
+            )
+
+        if "batch_id" not in columns:
+            connection.execute(text("ALTER TABLE expenses ADD COLUMN batch_id INTEGER"))
+
+
+def normalize_expense_accounting_type(value: str | None) -> str:
+    normalized = (value or "").strip().lower()
+    if normalized in {"product", "personal", "not_selected"}:
+        return normalized
+    return "not_selected"
+
+
+def normalize_expense_accounting_channel(value: str | None) -> str:
+    normalized = (value or "").strip().lower()
+    if normalized in {"dk", "pocket", "not_selected"}:
+        return normalized
+    return "not_selected"
+
+
+def normalize_expense_currency(value: str | None) -> str:
+    normalized = (value or "CNY").strip().upper()
+    if normalized in {"CNY", "USD", "UZS"}:
+        return normalized
+    return "CNY"
+
+
+def ensure_profile_columns() -> None:
+    inspector = inspect(engine)
+
+    if "profiles" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("profiles")}
+
+    with engine.begin() as connection:
+        if "cny_to_usd" not in columns:
+            connection.execute(
+                text("ALTER TABLE profiles ADD COLUMN cny_to_usd FLOAT DEFAULT 0.0 NOT NULL")
+            )
+
+        if "usd_to_cny" not in columns:
+            connection.execute(
+                text("ALTER TABLE profiles ADD COLUMN usd_to_cny FLOAT DEFAULT 0.0 NOT NULL")
+            )
+
+        if "cny_to_usd" in columns:
+            connection.execute(
+                text(
+                    """
+                    UPDATE profiles
+                    SET usd_to_cny = CASE
+                        WHEN usd_to_cny > 0 THEN usd_to_cny
+                        WHEN cny_to_usd > 0 AND cny_to_usd < 2 THEN 1.0 / cny_to_usd
+                        WHEN cny_to_usd >= 2 THEN cny_to_usd
+                        ELSE 0
+                    END
+                    """
+                )
+            )
+
+        if "usd_to_uzs" not in columns:
+            connection.execute(
+                text("ALTER TABLE profiles ADD COLUMN usd_to_uzs FLOAT DEFAULT 0.0 NOT NULL")
+            )
 
 
 def ensure_product_columns() -> None:
@@ -107,6 +263,87 @@ def ensure_product_columns() -> None:
             connection.execute(
                 text(
                     "ALTER TABLE products ADD COLUMN unit_price_with_share FLOAT DEFAULT 0.0 NOT NULL"
+                )
+            )
+
+        if "batch_id" not in columns:
+            connection.execute(text("ALTER TABLE products ADD COLUMN batch_id INTEGER"))
+
+        if "batch_item_type" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE products ADD COLUMN batch_item_type VARCHAR(32) DEFAULT 'regular' NOT NULL"
+                )
+            )
+            connection.execute(
+                text("UPDATE products SET batch_item_type = 'regular' WHERE batch_item_type IS NULL")
+            )
+
+        if "allocated_expense_per_unit_cny" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE products ADD COLUMN allocated_expense_per_unit_cny "
+                    "FLOAT DEFAULT 0.0 NOT NULL"
+                )
+            )
+
+        if "final_unit_cost_cny" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE products ADD COLUMN final_unit_cost_cny FLOAT DEFAULT 0.0 NOT NULL"
+                )
+            )
+
+        if "final_unit_cost_usd" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE products ADD COLUMN final_unit_cost_usd FLOAT DEFAULT 0.0 NOT NULL"
+                )
+            )
+
+        if "final_unit_cost_uzs" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE products ADD COLUMN final_unit_cost_uzs FLOAT DEFAULT 0.0 NOT NULL"
+                )
+            )
+
+        added_product_rate_columns = False
+
+        if "usd_to_cny_rate" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE products ADD COLUMN usd_to_cny_rate FLOAT DEFAULT 0.0 NOT NULL"
+                )
+            )
+            added_product_rate_columns = True
+
+        if "usd_to_uzs_rate" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE products ADD COLUMN usd_to_uzs_rate FLOAT DEFAULT 0.0 NOT NULL"
+                )
+            )
+            added_product_rate_columns = True
+
+        if added_product_rate_columns:
+            connection.execute(
+                text(
+                    """
+                    UPDATE products
+                    SET
+                        usd_to_cny_rate = (
+                            SELECT usd_to_cny FROM profiles WHERE id = 1
+                        ),
+                        usd_to_uzs_rate = (
+                            SELECT usd_to_uzs FROM profiles WHERE id = 1
+                        )
+                    WHERE
+                        (usd_to_cny_rate <= 0 OR usd_to_uzs_rate <= 0)
+                        AND EXISTS (
+                            SELECT 1 FROM profiles WHERE id = 1 AND usd_to_cny > 0
+                        )
+                    """
                 )
             )
 
@@ -263,6 +500,7 @@ def is_reserved_backend_path(path: str) -> bool:
         "profile",
         "shops",
         "products",
+        "batches",
         "expenses",
         "media",
         "uploads",
@@ -427,11 +665,47 @@ def serialize_shop(request: Request, shop: Shop, products_count: int = 0) -> Sho
     )
 
 
+VALID_BATCH_ITEM_TYPES = {"regular", "order"}
+
+
+def read_batch_item_type(product: Product) -> str:
+    normalized = (getattr(product, "batch_item_type", None) or "regular").strip().lower()
+
+    if normalized in VALID_BATCH_ITEM_TYPES:
+        return normalized
+
+    return "regular"
+
+
+def read_product_usd_to_cny_rate(product: Product) -> float:
+    rate = float(getattr(product, "usd_to_cny_rate", 0.0) or 0.0)
+    return rate if rate > 0 else 0.0
+
+
+def read_product_usd_to_uzs_rate(product: Product) -> float:
+    rate = float(getattr(product, "usd_to_uzs_rate", 0.0) or 0.0)
+    return rate if rate > 0 else 0.0
+
+
+def normalize_batch_item_type(value: str | None) -> str:
+    normalized = (value or "regular").strip().lower()
+
+    if normalized not in VALID_BATCH_ITEM_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="batch_item_type must be regular or order.",
+        )
+
+    return normalized
+
+
 def serialize_product(request: Request, product: Product, shop_name: str = "") -> ProductRead:
     return ProductRead(
         id=str(product.id),
         shop_id=str(product.shop_id or ""),
         shop_name=shop_name,
+        batch_id=str(product.batch_id) if product.batch_id is not None else None,
+        batch_item_type=read_batch_item_type(product),
         images=[to_public_image_url(request, image) for image in product.images],
         article=product.article,
         amount=product.amount,
@@ -439,6 +713,16 @@ def serialize_product(request: Request, product: Product, shop_name: str = "") -
         supplier_share_percent=float(product.supplier_share_percent),
         supplier_share_amount=float(product.supplier_share_amount),
         unit_price_with_share=float(product.unit_price_with_share),
+        allocated_expense_per_unit_cny=float(
+            getattr(product, "allocated_expense_per_unit_cny", 0.0) or 0.0
+        ),
+        final_unit_cost_cny=float(
+            getattr(product, "final_unit_cost_cny", 0.0) or product.unit_price_with_share
+        ),
+        final_unit_cost_usd=float(getattr(product, "final_unit_cost_usd", 0.0) or 0.0),
+        final_unit_cost_uzs=float(getattr(product, "final_unit_cost_uzs", 0.0) or 0.0),
+        usd_to_cny_rate=read_product_usd_to_cny_rate(product),
+        usd_to_uzs_rate=read_product_usd_to_uzs_rate(product),
         color=product.color,
         material=product.material,
         size=product.size,
@@ -449,14 +733,284 @@ def serialize_product(request: Request, product: Product, shop_name: str = "") -
     )
 
 
+def serialize_batch(
+    request: Request,
+    batch: Batch,
+    products: list[Product],
+    shop_names: dict[int, str],
+) -> BatchRead:
+    return BatchRead(
+        id=str(batch.id),
+        name=batch.name,
+        note=batch.note,
+        created_at=batch.created_at,
+        products=[
+            serialize_product(
+                request,
+                product,
+                shop_names.get(product.shop_id or 0, ""),
+            )
+            for product in products
+        ],
+    )
+
+
+def get_batch_or_404(batch_id: int, db: Session) -> Batch:
+    batch = db.get(Batch, batch_id)
+
+    if batch is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found.")
+
+    return batch
+
+
+def normalize_product_ids(product_ids: list[int]) -> list[int]:
+    unique_product_ids: list[int] = []
+    seen_ids: set[int] = set()
+
+    for raw_id in product_ids:
+        product_id = int(raw_id)
+        if product_id in seen_ids:
+            continue
+        seen_ids.add(product_id)
+        unique_product_ids.append(product_id)
+
+    return unique_product_ids
+
+
+def load_products_for_batch_assignment(
+    product_ids: list[int],
+    db: Session,
+    *,
+    target_batch_id: int | None = None,
+) -> list[Product]:
+    unique_product_ids = normalize_product_ids(product_ids)
+
+    if not unique_product_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one product must be selected.",
+        )
+
+    products: list[Product] = []
+
+    for product_id in unique_product_ids:
+        product = db.get(Product, product_id)
+
+        if product is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Product {product_id} not found.",
+            )
+
+        if product.batch_id is not None and product.batch_id != target_batch_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Товар уже находится в партии.",
+            )
+
+        products.append(product)
+
+    return products
+
+
+def calculate_expense_amounts(
+    amount_raw: str,
+    currency: str,
+    usd_to_cny_rate: float,
+    usd_to_uzs_rate: float,
+) -> tuple[float, float, float, float, float]:
+    amount_value = parse_amount_value(amount_raw) or 0.0
+    safe_usd_to_cny = max(0.0, float(usd_to_cny_rate))
+    safe_usd_to_uzs = max(0.0, float(usd_to_uzs_rate))
+    normalized_currency = normalize_expense_currency(currency)
+
+    if normalized_currency == "USD":
+        amount_usd = amount_value
+        amount_cny = amount_usd * safe_usd_to_cny
+        amount_uzs = amount_usd * safe_usd_to_uzs
+    elif normalized_currency == "UZS":
+        amount_uzs = amount_value
+        amount_usd = amount_uzs / safe_usd_to_uzs if safe_usd_to_uzs > 0 else 0.0
+        amount_cny = amount_usd * safe_usd_to_cny
+    else:
+        amount_cny = amount_value
+        amount_usd = amount_cny / safe_usd_to_cny if safe_usd_to_cny > 0 else 0.0
+        amount_uzs = amount_usd * safe_usd_to_uzs
+
+    return amount_cny, amount_usd, amount_uzs, safe_usd_to_cny, safe_usd_to_uzs
+
+
+def apply_expense_fields(
+    expense: Expense,
+    *,
+    title: str,
+    amount_raw: str,
+    note: str,
+    accounting_type: str,
+    accounting_channel: str,
+    currency: str,
+    usd_to_cny_rate: float,
+    usd_to_uzs_rate: float,
+) -> None:
+    expense.title = title.strip()
+    expense.note = note.strip()
+    expense.accounting_type = normalize_expense_accounting_type(accounting_type)
+    expense.accounting_channel = normalize_expense_accounting_channel(accounting_channel)
+    expense.currency = normalize_expense_currency(currency)
+    amount_cny, amount_usd, amount_uzs, cny_rate, uzs_rate = calculate_expense_amounts(
+        amount_raw,
+        expense.currency,
+        usd_to_cny_rate,
+        usd_to_uzs_rate,
+    )
+    expense.amount = amount_raw.strip()
+    expense.amount_cny = amount_cny
+    expense.amount_usd = amount_usd
+    expense.amount_uzs = amount_uzs
+    expense.usd_to_cny_rate = cny_rate
+    expense.usd_to_uzs_rate = uzs_rate
+
+
+def backfill_expense_metadata(db: Session) -> None:
+    expenses = list(db.scalars(select(Expense)).all())
+    changed = False
+
+    for expense in expenses:
+        normalized_type = normalize_expense_accounting_type(expense.accounting_type)
+        normalized_channel = normalize_expense_accounting_channel(
+            expense.accounting_channel
+        )
+        normalized_currency = normalize_expense_currency(expense.currency)
+
+        if (
+            expense.accounting_type != normalized_type
+            or expense.accounting_channel != normalized_channel
+            or expense.currency != normalized_currency
+        ):
+            expense.accounting_type = normalized_type
+            expense.accounting_channel = normalized_channel
+            expense.currency = normalized_currency
+            changed = True
+
+    if changed:
+        db.commit()
+
+
+def backfill_expense_currency_values(db: Session) -> None:
+    profile = ensure_profile(db)
+    expenses = list(db.scalars(select(Expense)).all())
+    changed = False
+
+    for expense in expenses:
+        amount_cny, amount_usd, amount_uzs, cny_rate, uzs_rate = calculate_expense_amounts(
+            expense.amount,
+            expense.currency,
+            float(expense.usd_to_cny_rate)
+            if expense.usd_to_cny_rate is not None and float(expense.usd_to_cny_rate) > 0
+            else float(profile.usd_to_cny),
+            float(expense.usd_to_uzs_rate)
+            if expense.usd_to_uzs_rate is not None and float(expense.usd_to_uzs_rate) > 0
+            else float(profile.usd_to_uzs),
+        )
+
+        if (
+            float(expense.amount_cny) != amount_cny
+            or float(expense.amount_usd) != amount_usd
+            or float(expense.amount_uzs) != amount_uzs
+            or float(expense.usd_to_cny_rate) != cny_rate
+            or float(expense.usd_to_uzs_rate) != uzs_rate
+        ):
+            expense.amount_cny = amount_cny
+            expense.amount_usd = amount_usd
+            expense.amount_uzs = amount_uzs
+            expense.usd_to_cny_rate = cny_rate
+            expense.usd_to_uzs_rate = uzs_rate
+            changed = True
+
+    if changed:
+        db.commit()
+
+
 def serialize_expense(expense: Expense) -> ExpenseRead:
     return ExpenseRead(
         id=str(expense.id),
         title=expense.title,
+        accounting_type=expense.accounting_type,
+        accounting_channel=expense.accounting_channel,
+        currency=expense.currency,
         amount=expense.amount,
+        amount_cny=float(expense.amount_cny),
+        amount_usd=float(expense.amount_usd),
+        amount_uzs=float(expense.amount_uzs),
+        usd_to_cny_rate=float(expense.usd_to_cny_rate),
+        usd_to_uzs_rate=float(expense.usd_to_uzs_rate),
         note=expense.note,
+        batch_id=str(expense.batch_id) if expense.batch_id is not None else None,
         created_at=expense.created_at,
     )
+
+
+def recalculate_batch_expense_allocation(
+    batch_id: int,
+    db: Session,
+    *,
+    profile: Profile | None = None,
+) -> None:
+    db.flush()
+
+    expenses = list(
+        db.scalars(select(Expense).where(Expense.batch_id == batch_id)).all()
+    )
+    total_expenses_cny = sum(float(expense.amount_cny) for expense in expenses)
+
+    products = list(
+        db.scalars(select(Product).where(Product.batch_id == batch_id)).all()
+    )
+
+    regular_products = [
+        product
+        for product in products
+        if read_batch_item_type(product) == "regular"
+    ]
+    total_regular_quantity = sum(max(1, int(product.quantity)) for product in regular_products)
+
+    expense_per_unit_cny = (
+        total_expenses_cny / total_regular_quantity if total_regular_quantity > 0 else 0.0
+    )
+
+    for product in products:
+        unit_base = float(product.unit_price_with_share)
+
+        if read_batch_item_type(product) == "regular":
+            allocated = expense_per_unit_cny
+            final_cny = unit_base + allocated
+        else:
+            allocated = 0.0
+            final_cny = unit_base
+
+        product.allocated_expense_per_unit_cny = allocated
+        product.final_unit_cost_cny = final_cny
+        usd_to_cny = read_product_usd_to_cny_rate(product)
+        usd_to_uzs = read_product_usd_to_uzs_rate(product)
+        product.final_unit_cost_usd = final_cny / usd_to_cny if usd_to_cny > 0 else 0.0
+        product.final_unit_cost_uzs = (
+            product.final_unit_cost_usd * usd_to_uzs if usd_to_uzs > 0 else 0.0
+        )
+
+
+def recalculate_batches_for_expense(expense: Expense, db: Session, *, previous_batch_id: int | None = None) -> None:
+    profile = ensure_profile(db)
+    batch_ids: set[int] = set()
+
+    if previous_batch_id is not None:
+        batch_ids.add(previous_batch_id)
+
+    if expense.batch_id is not None:
+        batch_ids.add(int(expense.batch_id))
+
+    for batch_id in batch_ids:
+        recalculate_batch_expense_allocation(batch_id, db, profile=profile)
 
 
 def delete_uploaded_image(image_path: str) -> None:
@@ -620,6 +1174,8 @@ def build_shop_name_map(db: Session) -> dict[int, str]:
 async def lifespan(_: FastAPI):
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(bind=engine)
+    ensure_profile_columns()
+    ensure_expense_columns()
     ensure_product_columns()
     ensure_shop_columns()
 
@@ -627,11 +1183,13 @@ async def lifespan(_: FastAPI):
         ensure_profile(db)
         ensure_existing_products_have_shop(db)
         backfill_supplier_share_values(db)
+        backfill_expense_metadata(db)
+        backfill_expense_currency_values(db)
 
     yield
 
 
-app = FastAPI(title="Azaly Trade API", version="0.7.0", lifespan=lifespan)
+app = FastAPI(title="Azaly Trade API", version="0.8.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -662,6 +1220,13 @@ def get_profile(db: Session = Depends(get_db)) -> Profile:
 def update_profile(payload: ProfileUpdate, db: Session = Depends(get_db)) -> Profile:
     profile = ensure_profile(db)
     profile.name = payload.name.strip() or "Azaly Trade"
+
+    if payload.usd_to_cny is not None:
+        profile.usd_to_cny = max(0.0, float(payload.usd_to_cny))
+
+    if payload.usd_to_uzs is not None:
+        profile.usd_to_uzs = max(0.0, float(payload.usd_to_uzs))
+
     db.commit()
     db.refresh(profile)
     return profile
@@ -840,6 +1405,9 @@ def create_product(
         payload.quantity,
         payload.supplier_share_percent,
     )
+    profile = ensure_profile(db)
+    usd_to_cny = float(profile.usd_to_cny) if float(profile.usd_to_cny) > 0 else 0.0
+    usd_to_uzs = float(profile.usd_to_uzs) if float(profile.usd_to_uzs) > 0 else 0.0
 
     product = Product(
         shop_id=shop.id,
@@ -850,6 +1418,8 @@ def create_product(
         supplier_share_percent=share_percent,
         supplier_share_amount=share_amount,
         unit_price_with_share=unit_price_with_share,
+        usd_to_cny_rate=usd_to_cny,
+        usd_to_uzs_rate=usd_to_uzs,
         color=payload.color.strip(),
         material=payload.material.strip(),
         size=payload.size.strip(),
@@ -910,6 +1480,92 @@ def update_product(
     return serialize_product(request, product, shop.name)
 
 
+@app.patch("/products/{product_id}/batch-item-type", response_model=ProductRead)
+def update_product_batch_item_type(
+    product_id: int,
+    request: Request,
+    payload: ProductBatchItemTypeUpdate,
+    db: Session = Depends(get_db),
+) -> ProductRead:
+    product = db.get(Product, product_id)
+
+    if product is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
+
+    if product.batch_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Product is not assigned to a batch.",
+        )
+
+    product.batch_item_type = normalize_batch_item_type(payload.batch_item_type)
+
+    if product.batch_id is not None:
+        recalculate_batch_expense_allocation(product.batch_id, db)
+
+    db.commit()
+    db.refresh(product)
+
+    shop_name = ""
+    if product.shop_id is not None:
+        shop = db.get(Shop, product.shop_id)
+        if shop is not None:
+            shop_name = shop.name
+
+    return serialize_product(request, product, shop_name)
+
+
+@app.patch("/products/{product_id}/batch-membership", response_model=ProductRead)
+def update_product_batch_membership(
+    product_id: int,
+    request: Request,
+    payload: ProductBatchMembershipUpdate,
+    db: Session = Depends(get_db),
+) -> ProductRead:
+    product = db.get(Product, product_id)
+
+    if product is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
+
+    if payload.batch_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Use batch assignment endpoints to add products to a batch.",
+        )
+
+    if product.batch_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Product is not assigned to a batch.",
+        )
+
+    previous_batch_id = product.batch_id
+    product.batch_id = None
+    product.batch_item_type = "regular"
+    product.allocated_expense_per_unit_cny = 0.0
+    unit_base = float(product.unit_price_with_share)
+    product.final_unit_cost_cny = unit_base
+    usd_to_cny = read_product_usd_to_cny_rate(product)
+    usd_to_uzs = read_product_usd_to_uzs_rate(product)
+    product.final_unit_cost_usd = unit_base / usd_to_cny if usd_to_cny > 0 else 0.0
+    product.final_unit_cost_uzs = (
+        product.final_unit_cost_usd * usd_to_uzs if usd_to_uzs > 0 else 0.0
+    )
+
+    recalculate_batch_expense_allocation(previous_batch_id, db)
+
+    db.commit()
+    db.refresh(product)
+
+    shop_name = ""
+    if product.shop_id is not None:
+        shop = db.get(Shop, product.shop_id)
+        if shop is not None:
+            shop_name = shop.name
+
+    return serialize_product(request, product, shop_name)
+
+
 @app.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_product(product_id: int, db: Session = Depends(get_db)) -> None:
     product = db.get(Product, product_id)
@@ -924,6 +1580,115 @@ def delete_product(product_id: int, db: Session = Depends(get_db)) -> None:
     remove_unused_uploaded_images(db, product_images)
 
 
+@app.get("/batches", response_model=list[BatchRead])
+def list_batches(
+    request: Request,
+    include_products: bool = True,
+    db: Session = Depends(get_db),
+) -> list[BatchRead]:
+    batches = list(db.scalars(select(Batch).order_by(Batch.created_at.desc())).all())
+    shop_names = build_shop_name_map(db)
+    response: list[BatchRead] = []
+
+    for batch in batches:
+        if include_products:
+            products = list(
+                db.scalars(
+                    select(Product)
+                    .where(Product.batch_id == batch.id)
+                    .order_by(Product.created_at.desc())
+                ).all()
+            )
+        else:
+            products = []
+
+        response.append(serialize_batch(request, batch, products, shop_names))
+
+    return response
+
+
+@app.post("/batches", response_model=BatchRead, status_code=status.HTTP_201_CREATED)
+def create_batch(
+    payload: BatchCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> BatchRead:
+    products = load_products_for_batch_assignment(payload.product_ids, db)
+
+    batch = Batch(name=payload.name.strip(), note=payload.note.strip())
+    db.add(batch)
+    db.flush()
+
+    for product in products:
+        product.batch_id = batch.id
+
+    db.commit()
+    db.refresh(batch)
+    shop_names = build_shop_name_map(db)
+    assigned_products = list(
+        db.scalars(
+            select(Product)
+            .where(Product.batch_id == batch.id)
+            .order_by(Product.created_at.desc())
+        ).all()
+    )
+    return serialize_batch(request, batch, assigned_products, shop_names)
+
+
+@app.post("/batches/{batch_id}/products", response_model=BatchRead)
+def add_products_to_batch(
+    batch_id: int,
+    payload: BatchAddProducts,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> BatchRead:
+    batch = get_batch_or_404(batch_id, db)
+    products = load_products_for_batch_assignment(
+        payload.product_ids,
+        db,
+        target_batch_id=batch.id,
+    )
+
+    for product in products:
+        product.batch_id = batch.id
+
+    db.commit()
+    db.refresh(batch)
+    shop_names = build_shop_name_map(db)
+    assigned_products = list(
+        db.scalars(
+            select(Product)
+            .where(Product.batch_id == batch.id)
+            .order_by(Product.created_at.desc())
+        ).all()
+    )
+    return serialize_batch(request, batch, assigned_products, shop_names)
+
+
+@app.put("/batches/{batch_id}", response_model=BatchRead)
+def update_batch(
+    batch_id: int,
+    payload: BatchUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> BatchRead:
+    batch = get_batch_or_404(batch_id, db)
+    batch.name = payload.name.strip()
+    batch.note = payload.note.strip()
+    db.commit()
+    db.refresh(batch)
+
+    products = list(
+        db.scalars(
+            select(Product)
+            .where(Product.batch_id == batch.id)
+            .order_by(Product.created_at.desc())
+        ).all()
+    )
+    shop_names = build_shop_name_map(db)
+    return serialize_batch(request, batch, products, shop_names)
+
+
 @app.get("/expenses", response_model=list[ExpenseRead])
 def list_expenses(db: Session = Depends(get_db)) -> list[ExpenseRead]:
     expenses = list(db.scalars(select(Expense).order_by(Expense.created_at.desc())).all())
@@ -932,10 +1697,18 @@ def list_expenses(db: Session = Depends(get_db)) -> list[ExpenseRead]:
 
 @app.post("/expenses", response_model=ExpenseRead, status_code=status.HTTP_201_CREATED)
 def create_expense(payload: ExpenseCreate, db: Session = Depends(get_db)) -> ExpenseRead:
-    expense = Expense(
-        title=payload.title.strip(),
-        amount=payload.amount.strip(),
-        note=payload.note.strip(),
+    profile = ensure_profile(db)
+    expense = Expense()
+    apply_expense_fields(
+        expense,
+        title=payload.title,
+        amount_raw=payload.amount,
+        note=payload.note,
+        accounting_type=payload.accounting_type,
+        accounting_channel=payload.accounting_channel,
+        currency=payload.currency,
+        usd_to_cny_rate=float(profile.usd_to_cny),
+        usd_to_uzs_rate=float(profile.usd_to_uzs),
     )
     db.add(expense)
     db.commit()
@@ -954,9 +1727,70 @@ def update_expense(
     if expense is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found.")
 
-    expense.title = payload.title.strip()
-    expense.amount = payload.amount.strip()
-    expense.note = payload.note.strip()
+    profile = ensure_profile(db)
+    linked_batch_id = expense.batch_id
+    apply_expense_fields(
+        expense,
+        title=payload.title,
+        amount_raw=payload.amount,
+        note=payload.note,
+        accounting_type=payload.accounting_type,
+        accounting_channel=payload.accounting_channel,
+        currency=payload.currency,
+        usd_to_cny_rate=float(profile.usd_to_cny),
+        usd_to_uzs_rate=float(profile.usd_to_uzs),
+    )
+
+    if linked_batch_id is not None:
+        recalculate_batch_expense_allocation(linked_batch_id, db, profile=profile)
+
+    db.commit()
+    db.refresh(expense)
+    return serialize_expense(expense)
+
+
+@app.patch("/expenses/{expense_id}/batch-assignment", response_model=ExpenseRead)
+def assign_expense_to_batch(
+    expense_id: int,
+    payload: ExpenseBatchAssignmentUpdate,
+    db: Session = Depends(get_db),
+) -> ExpenseRead:
+    expense = db.get(Expense, expense_id)
+
+    if expense is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found.")
+
+    previous_batch_id = expense.batch_id
+    batch_id_raw = (payload.batch_id or "").strip()
+
+    if not batch_id_raw:
+        expense.batch_id = None
+        db.flush()
+
+        if previous_batch_id is not None:
+            recalculate_batch_expense_allocation(previous_batch_id, db)
+
+        db.commit()
+        db.refresh(expense)
+        return serialize_expense(expense)
+
+    try:
+        batch_id = int(batch_id_raw)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid batch id.",
+        ) from error
+
+    batch = get_batch_or_404(batch_id, db)
+    expense.batch_id = batch.id
+    db.flush()
+
+    recalculate_batches_for_expense(
+        expense,
+        db,
+        previous_batch_id=previous_batch_id,
+    )
 
     db.commit()
     db.refresh(expense)
@@ -970,7 +1804,13 @@ def delete_expense(expense_id: int, db: Session = Depends(get_db)) -> None:
     if expense is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found.")
 
+    previous_batch_id = expense.batch_id
     db.delete(expense)
+    db.flush()
+
+    if previous_batch_id is not None:
+        recalculate_batch_expense_allocation(previous_batch_id, db)
+
     db.commit()
 
 

@@ -1,3 +1,5 @@
+import 'batch_item_type.dart';
+
 class Product {
   const Product({
     required this.id,
@@ -17,18 +19,40 @@ class Product {
     required this.status,
     required this.createdAt,
     required this.isFavorite,
+    this.batchId,
+    this.batchItemType = BatchItemType.regular,
+    this.allocatedExpensePerUnitCny = 0,
+    this.finalUnitCostCny = 0,
+    this.finalUnitCostUsd = 0,
+    this.finalUnitCostUzs = 0,
+    this.usdToCnyRate = 0,
+    this.usdToUzsRate = 0,
   });
 
   final String id;
   final String shopId;
   final String shopName;
+  final String? batchId;
+  final BatchItemType batchItemType;
   final List<String> imagePaths;
+
+  bool get participatesInBatchExpenseDistribution {
+    final hasBatch = batchId != null && batchId!.isNotEmpty;
+
+    return hasBatch && !batchItemType.isOrder;
+  }
   final String article;
   final String amount;
   final int quantity;
   final double supplierSharePercent;
   final double supplierShareAmount;
   final double unitPriceWithShare;
+  final double allocatedExpensePerUnitCny;
+  final double finalUnitCostCny;
+  final double finalUnitCostUsd;
+  final double finalUnitCostUzs;
+  final double usdToCnyRate;
+  final double usdToUzsRate;
   final String color;
   final String material;
   final String size;
@@ -65,6 +89,14 @@ class Product {
     return calculateNetTotal(amount, quantity, supplierSharePercent);
   }
 
+  double get effectiveUnitCostCny {
+    if (finalUnitCostCny > 0) {
+      return finalUnitCostCny;
+    }
+
+    return unitPriceWithShare > 0 ? unitPriceWithShare : (amountValue ?? 0);
+  }
+
   double? get unitPriceWithShareValue {
     if (unitPriceWithShare > 0) {
       return unitPriceWithShare;
@@ -89,17 +121,28 @@ class Product {
     double? supplierSharePercent,
     double? supplierShareAmount,
     double? unitPriceWithShare,
+    double? allocatedExpensePerUnitCny,
+    double? finalUnitCostCny,
+    double? finalUnitCostUsd,
+    double? finalUnitCostUzs,
+    double? usdToCnyRate,
+    double? usdToUzsRate,
     String? color,
     String? material,
     String? size,
     String? measurements,
     String? status,
     bool? isFavorite,
+    String? batchId,
+    BatchItemType? batchItemType,
+    bool clearBatchId = false,
   }) {
     return Product(
       id: id,
       shopId: shopId ?? this.shopId,
       shopName: shopName ?? this.shopName,
+      batchId: clearBatchId ? null : (batchId ?? this.batchId),
+      batchItemType: batchItemType ?? this.batchItemType,
       imagePaths: imagePaths ?? this.imagePaths,
       article: article ?? this.article,
       amount: amount ?? this.amount,
@@ -108,6 +151,13 @@ class Product {
           supplierSharePercent ?? this.supplierSharePercent,
       supplierShareAmount: supplierShareAmount ?? this.supplierShareAmount,
       unitPriceWithShare: unitPriceWithShare ?? this.unitPriceWithShare,
+      allocatedExpensePerUnitCny:
+          allocatedExpensePerUnitCny ?? this.allocatedExpensePerUnitCny,
+      finalUnitCostCny: finalUnitCostCny ?? this.finalUnitCostCny,
+      finalUnitCostUsd: finalUnitCostUsd ?? this.finalUnitCostUsd,
+      finalUnitCostUzs: finalUnitCostUzs ?? this.finalUnitCostUzs,
+      usdToCnyRate: usdToCnyRate ?? this.usdToCnyRate,
+      usdToUzsRate: usdToUzsRate ?? this.usdToUzsRate,
       color: color ?? this.color,
       material: material ?? this.material,
       size: size ?? this.size,
@@ -144,6 +194,30 @@ class Product {
           (json['unitPriceWithShare'] as num?)?.toDouble() ??
           (json['unit_price_with_share'] as num?)?.toDouble() ??
           0,
+      allocatedExpensePerUnitCny:
+          (json['allocatedExpensePerUnitCny'] as num?)?.toDouble() ??
+          (json['allocated_expense_per_unit_cny'] as num?)?.toDouble() ??
+          0,
+      finalUnitCostCny:
+          (json['finalUnitCostCny'] as num?)?.toDouble() ??
+          (json['final_unit_cost_cny'] as num?)?.toDouble() ??
+          0,
+      finalUnitCostUsd:
+          (json['finalUnitCostUsd'] as num?)?.toDouble() ??
+          (json['final_unit_cost_usd'] as num?)?.toDouble() ??
+          0,
+      finalUnitCostUzs:
+          (json['finalUnitCostUzs'] as num?)?.toDouble() ??
+          (json['final_unit_cost_uzs'] as num?)?.toDouble() ??
+          0,
+      usdToCnyRate:
+          (json['usdToCnyRate'] as num?)?.toDouble() ??
+          (json['usd_to_cny_rate'] as num?)?.toDouble() ??
+          0,
+      usdToUzsRate:
+          (json['usdToUzsRate'] as num?)?.toDouble() ??
+          (json['usd_to_uzs_rate'] as num?)?.toDouble() ??
+          0,
       color: json['color'] as String? ?? '',
       material: json['material'] as String? ?? '',
       size: json['size'] as String? ?? '',
@@ -151,9 +225,39 @@ class Product {
       status: json['status'] as String? ?? 'new',
       createdAt:
           DateTime.tryParse(rawCreatedAt as String? ?? '') ?? DateTime.now(),
-      isFavorite: rawIsFavorite as bool? ?? false,
+      isFavorite: _readBool(rawIsFavorite),
+      batchId: _readOptionalId(json['batchId'] ?? json['batch_id']),
+      batchItemType: BatchItemType.fromValue(
+        json['batchItemType'] ?? json['batch_item_type'],
+      ),
     );
   }
+}
+
+bool _readBool(Object? value) {
+  if (value is bool) {
+    return value;
+  }
+
+  if (value is num) {
+    return value != 0;
+  }
+
+  final normalized = '$value'.trim().toLowerCase();
+  return normalized == 'true' || normalized == '1';
+}
+
+String? _readOptionalId(Object? value) {
+  if (value == null) {
+    return null;
+  }
+
+  final normalized = '$value'.trim();
+  if (normalized.isEmpty || normalized == 'null') {
+    return null;
+  }
+
+  return normalized;
 }
 
 String formatProductDate(DateTime date) {
@@ -233,6 +337,31 @@ double? calculateUnitPriceWithShare(
   }
 
   return unitPrice + (supplierShare / quantity);
+}
+
+class CurrencyAmounts {
+  const CurrencyAmounts({
+    required this.cny,
+    required this.usd,
+    required this.uzs,
+  });
+
+  final double cny;
+  final double usd;
+  final double uzs;
+}
+
+CurrencyAmounts convertCnyToCurrencies(
+  double amountCny,
+  double usdToCnyRate,
+  double usdToUzsRate,
+) {
+  final safeUsdToCny = usdToCnyRate > 0 ? usdToCnyRate : 0.0;
+  final safeUsdToUzs = usdToUzsRate > 0 ? usdToUzsRate : 0.0;
+  final usd = safeUsdToCny > 0 ? amountCny / safeUsdToCny : 0.0;
+  final uzs = usd * safeUsdToUzs;
+
+  return CurrencyAmounts(cny: amountCny, usd: usd, uzs: uzs);
 }
 
 String formatProductMoney(double value) {

@@ -282,6 +282,48 @@ class AppStrings {
       'en': 'Here you can change the header name and the app language.',
       'zh': '这里可以修改顶部名称并选择应用语言。',
     },
+    'currencySectionTitle': {
+      'ru': 'Валюта',
+      'en': 'Currency',
+      'zh': '货币',
+    },
+    'currencySectionDescription': {
+      'ru':
+          'Закупы вводятся в CNY. Здесь задаются курсы 1 USD к CNY и UZS.',
+      'en':
+          'Purchases are entered in CNY. Set 1 USD rates to CNY and UZS here.',
+      'zh': '采购以人民币输入。在此设置 1 美元兑人民币与乌兹别克苏姆汇率。',
+    },
+    'currencyBaseTitle': {
+      'ru': 'Базовая валюта закупов',
+      'en': 'Base purchase currency',
+      'zh': '采购基础货币',
+    },
+    'currencyCnyLabel': {
+      'ru': 'CNY (юань)',
+      'en': 'CNY (yuan)',
+      'zh': 'CNY（人民币）',
+    },
+    'currencyUsdRateLabel': {
+      'ru': '1 USD =',
+      'en': '1 USD =',
+      'zh': '1 USD =',
+    },
+    'currencyRateHint': {
+      'ru': 'Курс',
+      'en': 'Rate',
+      'zh': '汇率',
+    },
+    'settingsSaved': {
+      'ru': 'Настройки сохранены',
+      'en': 'Settings saved',
+      'zh': '设置已保存',
+    },
+    'settingsSaveFailed': {
+      'ru': 'Не удалось сохранить настройки',
+      'en': 'Failed to save settings',
+      'zh': '无法保存设置',
+    },
     'headerName': {'ru': 'Имя в шапке', 'en': 'Header name', 'zh': '顶部名称'},
     'yourName': {'ru': 'Ваше имя', 'en': 'Your name', 'zh': '你的名字'},
     'nameHint': {

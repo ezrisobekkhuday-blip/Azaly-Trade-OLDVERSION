@@ -72,6 +72,7 @@ class ProductImage extends StatelessWidget {
             cacheWidth: cacheWidth,
             cacheHeight: cacheHeight,
             filterQuality: FilterQuality.low,
+            gaplessPlayback: true,
             errorBuilder: (_, _, _) =>
                 _ImageFallback(width: width, height: height),
           );

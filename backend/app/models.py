@@ -11,6 +11,8 @@ class Profile(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, default=1)
     name: Mapped[str] = mapped_column(String(100), default="Azaly Trade")
+    usd_to_cny: Mapped[float] = mapped_column(Float, default=0.0)
+    usd_to_uzs: Mapped[float] = mapped_column(Float, default=0.0)
 
 
 class Shop(Base):
@@ -32,11 +34,22 @@ class Shop(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class Batch(Base):
+    __tablename__ = "batches"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(140), default="")
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class Product(Base):
     __tablename__ = "products"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     shop_id: Mapped[int | None] = mapped_column(ForeignKey("shops.id"), nullable=True)
+    batch_id: Mapped[int | None] = mapped_column(ForeignKey("batches.id"), nullable=True)
+    batch_item_type: Mapped[str] = mapped_column(String(32), default="regular")
     images: Mapped[list[str]] = mapped_column(JSON, default=list)
     article: Mapped[str] = mapped_column(String(120), default="")
     amount: Mapped[str] = mapped_column(String(120), default="")
@@ -44,6 +57,12 @@ class Product(Base):
     supplier_share_percent: Mapped[float] = mapped_column(Float, default=10.0)
     supplier_share_amount: Mapped[float] = mapped_column(Float, default=0.0)
     unit_price_with_share: Mapped[float] = mapped_column(Float, default=0.0)
+    allocated_expense_per_unit_cny: Mapped[float] = mapped_column(Float, default=0.0)
+    final_unit_cost_cny: Mapped[float] = mapped_column(Float, default=0.0)
+    final_unit_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    final_unit_cost_uzs: Mapped[float] = mapped_column(Float, default=0.0)
+    usd_to_cny_rate: Mapped[float] = mapped_column(Float, default=0.0)
+    usd_to_uzs_rate: Mapped[float] = mapped_column(Float, default=0.0)
     color: Mapped[str] = mapped_column(String(80), default="")
     material: Mapped[str] = mapped_column(String(120), default="")
     size: Mapped[str] = mapped_column(String(120), default="")
@@ -58,6 +77,15 @@ class Expense(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String(140), default="")
+    accounting_type: Mapped[str] = mapped_column(String(32), default="not_selected")
+    accounting_channel: Mapped[str] = mapped_column(String(32), default="not_selected")
+    currency: Mapped[str] = mapped_column(String(8), default="CNY")
     amount: Mapped[str] = mapped_column(String(120), default="")
+    amount_cny: Mapped[float] = mapped_column(Float, default=0.0)
+    amount_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    amount_uzs: Mapped[float] = mapped_column(Float, default=0.0)
+    usd_to_cny_rate: Mapped[float] = mapped_column(Float, default=0.0)
+    usd_to_uzs_rate: Mapped[float] = mapped_column(Float, default=0.0)
     note: Mapped[str] = mapped_column(Text, default="")
+    batch_id: Mapped[int | None] = mapped_column(ForeignKey("batches.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

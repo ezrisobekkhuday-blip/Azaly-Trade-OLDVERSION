@@ -11,10 +11,14 @@ class ProfileRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     name: str
+    usd_to_cny: float
+    usd_to_uzs: float
 
 
 class ProfileUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
+    usd_to_cny: float | None = None
+    usd_to_uzs: float | None = None
 
 
 class StorefrontItemPayload(BaseModel):
@@ -103,10 +107,20 @@ class ProductUpdate(BaseModel):
     is_favorite: bool = False
 
 
+class ProductBatchItemTypeUpdate(BaseModel):
+    batch_item_type: str
+
+
+class ProductBatchMembershipUpdate(BaseModel):
+    batch_id: str | None = None
+
+
 class ProductRead(BaseModel):
     id: str
     shop_id: str
     shop_name: str
+    batch_id: str | None = None
+    batch_item_type: str = "regular"
     images: list[str]
     article: str
     amount: str
@@ -114,6 +128,12 @@ class ProductRead(BaseModel):
     supplier_share_percent: float
     supplier_share_amount: float
     unit_price_with_share: float
+    allocated_expense_per_unit_cny: float = 0.0
+    final_unit_cost_cny: float = 0.0
+    final_unit_cost_usd: float = 0.0
+    final_unit_cost_uzs: float = 0.0
+    usd_to_cny_rate: float = 0.0
+    usd_to_uzs_rate: float = 0.0
     color: str
     material: str
     size: str
@@ -123,21 +143,63 @@ class ProductRead(BaseModel):
     created_at: datetime
 
 
+class BatchCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=140)
+    product_ids: list[int] = Field(min_length=1)
+    note: str = ""
+
+
+class BatchUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=140)
+    note: str = ""
+
+
+class BatchAddProducts(BaseModel):
+    product_ids: list[int] = Field(min_length=1)
+
+
+class BatchRead(BaseModel):
+    id: str
+    name: str
+    note: str
+    created_at: datetime
+    products: list[ProductRead]
+
+
 class ExpenseCreate(BaseModel):
     title: str = Field(min_length=1, max_length=140)
     amount: str = Field(min_length=1, max_length=120)
     note: str = ""
+    accounting_type: str = "not_selected"
+    accounting_channel: str = "not_selected"
+    currency: str = "CNY"
 
 
 class ExpenseUpdate(BaseModel):
     title: str = Field(min_length=1, max_length=140)
     amount: str = Field(min_length=1, max_length=120)
     note: str = ""
+    accounting_type: str = "not_selected"
+    accounting_channel: str = "not_selected"
+    currency: str = "CNY"
+
+
+class ExpenseBatchAssignmentUpdate(BaseModel):
+    batch_id: str | None = None
 
 
 class ExpenseRead(BaseModel):
     id: str
     title: str
+    accounting_type: str
+    accounting_channel: str
+    currency: str
     amount: str
+    amount_cny: float
+    amount_usd: float
+    amount_uzs: float
+    usd_to_cny_rate: float
+    usd_to_uzs_rate: float
     note: str
+    batch_id: str | None = None
     created_at: datetime
